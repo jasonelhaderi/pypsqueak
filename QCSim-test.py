@@ -169,6 +169,13 @@ class TensorProductInvalidInput(unittest.TestCase):
 
         self.assertRaises(QCSim.InhomogenousInputError, QCSim.TensorProduct, *(q, g))
 
+    def test_one_input(self):
+        '''TensorProduct should fail with len(arg) == 1'''
+
+        q = QCSim.Qubit()
+        self.assertRaises(TypeError, QCSim.TensorProduct, q)
+
+
 class TensorProductValidInput(unittest.TestCase):
 
     def setUp(self):
