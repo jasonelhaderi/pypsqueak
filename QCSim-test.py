@@ -113,6 +113,18 @@ class GateValidInput(unittest.TestCase):
         for gate in test_gates:
             np.testing.assert_array_equal(gate[0], gate[1].state)
 
+    # def test_is_unitary(self):
+    #     '''Gate should confirm that input is a unitary matrix'''
+    #
+    #     phi_1, phi_2, theta = np.multiply(2*np.pi, np.random.rand(3))
+    #     rand_unitary = np.array([[np.exp(phi_1 * 1j) * np.cos(theta), np.exp(phi_2 * 1j) * np.sin(theta)],
+    #                              [-np.exp(-phi_2 * 1j) * np.sin(theta), np.exp(-phi_1 * 1j) * np.cos(theta)]])
+    #     # rand_unitary_dagger = rand_unitary.conj().T
+    #     # rand_unitary_product = np.dot(rand_unitary_dagger, rand_unitary)
+    #     gate_unitary = QCSim.Gate(rand_unitary)
+    #
+    #     np.testing.assert_array_almost_equal(rand_unitary_product, np.eye(2))
+
 class GateInvalidInput(unittest.TestCase):
 
     def test_non_list_non_tuple(self):
@@ -138,6 +150,20 @@ class GateInvalidInput(unittest.TestCase):
         for candidate in wrong_shapes:
             self.assertRaises(QCSim.WrongShapeError, QCSim.Gate, candidate)
 
+    def test_not_unitary(self):
+        '''Gate should fail to initialize non-unitary matrix'''
+        M1 = [[1, 5],
+              [10, 7]]
+        M2 = [[0, 1j],
+              [1j + 17, 0]]
+        M3 = [[4, 0],
+              [0, -3]]
+        M4 = [[0, 0],
+              [0, 0]]
+
+        non_unitary_matricies = [M1, M2, M3, M4]
+        for matrix in non_unitary_matricies:
+            self.assertRaises(QCSim.NonUnitaryInputError, QCSim.Gate, matrix)
 
 # TensorProduct tests
 

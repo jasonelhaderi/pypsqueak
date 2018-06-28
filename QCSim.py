@@ -1,7 +1,7 @@
 import numpy as np
 
 # 1: Add support for printing qubits(DONE), gates(DONE), and tensor products nicely(DONE).
-# 2: Add check to gates that unitary.
+# 2: Add check to gates that unitary(DONE).
 # 3: Add check to TensorProduct that makes sure unitary if gate, normalized if qubits.
 # 4: Accomplish above line by making ProductOfGates and ProductOfQubits to
 #    replace TensorProduct and have them inherit from Gate and Qubit. This would
@@ -81,7 +81,7 @@ class Gate:
                                                     for element in some_matrix):
             raise ValueError('Elements of input must be list or tuple.')
 
-        # Checks that the input is a sensible 2X2 matrix.
+        # Checks that the input is a 2X2 matrix
         elif len(some_matrix) != 2:
             raise WrongShapeError('Gate must have shape (2, 2).')
 
@@ -91,8 +91,14 @@ class Gate:
         elif len(some_matrix[0]) != len(some_matrix[-1]):
             raise WrongShapeError('Gate must have shape (2, 2).')
 
-        # Initialize the gate.
+        # Initialize the gate
         self.state = np.array(some_matrix)
+
+        # Checks that the input is unitary
+        product_with_conj = np.dot(self.state.conj().T, self.state)
+        is_unitary = np.allclose(product_with_conj, np.eye(2))
+        if is_unitary == False:
+            raise NonUnitaryInputError('Gate must be unitary.')
 
     def print_state(self):
         print(self.state)
@@ -106,7 +112,7 @@ class TensorProduct:
     def __init__(self, *arg):
         self.parts = []
 
-        # Check that arg isn't empty.
+        # Check that arg isn't empty
         if len(arg) == 0:
             raise TypeError('Input must be nonempty.')
 
@@ -162,8 +168,10 @@ class NullVectorError(ValueError):
 class InhomogenousInputError(TypeError):
     pass
 
+class NonUnitaryInputError(ValueError):
+    pass
 
-# Tests.
+# Tests
 
 # q0 = Qubit([1, 0])
 # q1 = Qubit([0, 1])
