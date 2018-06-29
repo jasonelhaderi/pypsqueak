@@ -13,7 +13,8 @@ class QubitValidInput(unittest.TestCase):
                     [24.0, 6],
                     (24.0, 6),
                     [1 - 1j, 0j],
-                    [-25.0, 9j]]
+                    [-25.0, 9j],
+                    [-25.0, 9j, 3, 5]]
 
     def setUp(self):
         self.test_qubit = QCSim.Qubit()
@@ -67,10 +68,9 @@ class QubitInvalidInput(unittest.TestCase):
             self.assertRaises(TypeError, self.test_qubit.validate_state, candidate)
 
     def test_wrong_length(self):
-        '''validate_state should fail for input with length != 2'''
+        '''validate_state should fail for input with length not even'''
         wrong_length = [[0, 1, 34],
-                        [7],
-                        [4, 3, 10, -43]]
+                        [7]]
         for candidate in wrong_length:
             self.assertRaises(QCSim.WrongShapeError, self.test_qubit.validate_state, candidate)
 
@@ -81,6 +81,21 @@ class QubitInvalidInput(unittest.TestCase):
                         ()]
         for null_vec in null_vectors:
             self.assertRaises(QCSim.NullVectorError, self.test_qubit.validate_state, null_vec)
+
+class QubitProductValidInput(unittest.TestCase):
+
+    def test_known_qubit_product(self):
+        product_state_01 = np.array([0, 1, 0, 0])
+        q0 = QCSim.Qubit()
+        q1 = QCSim.Qubit([0, 1])
+        test_product_state_01 = q0.qubit_product(q1)
+
+        np.testing.assert_array_equal(product_state_01, test_product_state_01.state)
+
+class QubitProductInvalidInput(unittest.TestCase):
+
+    def test_empty_input(self):
+        self.assertRaises(TypeError, QCSim.Qubit().qubit_product)
 
 # Gate tests
 
@@ -113,18 +128,6 @@ class GateValidInput(unittest.TestCase):
         for gate in test_gates:
             np.testing.assert_array_equal(gate[0], gate[1].state)
 
-    # def test_is_unitary(self):
-    #     '''Gate should confirm that input is a unitary matrix'''
-    #
-    #     phi_1, phi_2, theta = np.multiply(2*np.pi, np.random.rand(3))
-    #     rand_unitary = np.array([[np.exp(phi_1 * 1j) * np.cos(theta), np.exp(phi_2 * 1j) * np.sin(theta)],
-    #                              [-np.exp(-phi_2 * 1j) * np.sin(theta), np.exp(-phi_1 * 1j) * np.cos(theta)]])
-    #     # rand_unitary_dagger = rand_unitary.conj().T
-    #     # rand_unitary_product = np.dot(rand_unitary_dagger, rand_unitary)
-    #     gate_unitary = QCSim.Gate(rand_unitary)
-    #
-    #     np.testing.assert_array_almost_equal(rand_unitary_product, np.eye(2))
-
 class GateInvalidInput(unittest.TestCase):
 
     def test_non_list_non_tuple(self):
@@ -137,8 +140,8 @@ class GateInvalidInput(unittest.TestCase):
         for candidate in not_list_of_rows:
             self.assertRaises(ValueError, QCSim.Gate, candidate)
 
-    def test_wrong_shape(self):
-        '''Gate should fail to initialize if input doesn't have shape (2, 2)'''
+    def test_not_square(self):
+        '''Gate should fail to initialize if input doesn't have shape (n, n)'''
         wrong_shapes = [[[]],
                         [[1, 2]],
                         [[1, 2, 3],
@@ -150,6 +153,14 @@ class GateInvalidInput(unittest.TestCase):
         for candidate in wrong_shapes:
             self.assertRaises(QCSim.WrongShapeError, QCSim.Gate, candidate)
 
+    def test_not_even(self):
+        '''Gate should fail if matrix is not 2nX2n for integer n'''
+        uneven_shape = [[1, 0, 0],
+                         [0, 1, 0],
+                         [0, 0, 1]]
+
+        self.assertRaises(QCSim.WrongShapeError, QCSim.Gate, uneven_shape)
+
     def test_not_unitary(self):
         '''Gate should fail to initialize non-unitary matrix'''
         M1 = [[1, 5],
@@ -158,73 +169,59 @@ class GateInvalidInput(unittest.TestCase):
               [1j + 17, 0]]
         M3 = [[4, 0],
               [0, -3]]
-        M4 = [[0, 0],
-              [0, 0]]
+        M4 = [[0, 0, 0, 0],
+              [0, 0, 0, 0],
+              [0, 0, 0, 0],
+              [0, 0, 0, 0]]
 
         non_unitary_matricies = [M1, M2, M3, M4]
         for matrix in non_unitary_matricies:
             self.assertRaises(QCSim.NonUnitaryInputError, QCSim.Gate, matrix)
 
-# TensorProduct tests
+class GateProductValidInput(unittest.TestCase):
 
-class TensorProductInvalidInput(unittest.TestCase):
-
-    def test_empty_input(self):
-        '''Initialization should fail with empty input'''
-        self.assertRaises(TypeError, QCSim.TensorProduct)
-
-    def test_input_not_qubit_or_gate(self):
-        '''Input with non-qubit or -gate elements should fail to initialize'''
-
-        wrong_elements = [[1],
-                          [[2, 5]],
-                          ['qwe'],
-                          ((4)),
-                          {'key':'value'},
-                          2,
-                          'string',
-                          *(2, 3, 5)]
-        for candidate in wrong_elements:
-            self.assertRaises(TypeError, QCSim.TensorProduct, candidate)
-
-    def test_inhomogenous_input(self):
-        '''TensorProduct should fail to initialize with inhomogenous input'''
-
-        q = QCSim.Qubit()
-        g = QCSim.Gate()
-
-        self.assertRaises(QCSim.InhomogenousInputError, QCSim.TensorProduct, *(q, g))
-
-    def test_one_input(self):
-        '''TensorProduct should fail with len(arg) == 1'''
-
-        q = QCSim.Qubit()
-        self.assertRaises(TypeError, QCSim.TensorProduct, q)
-
-
-class TensorProductValidInput(unittest.TestCase):
-
-    def setUp(self):
-        self.test_q0 = QCSim.Qubit()
-        self.test_q1 = QCSim.Qubit([0, 1])
-
-    def test_gate_product(self):
-        '''Verifies the tensor product of X and I'''
-        gate_x = QCSim.Gate([[0, 1],
-                             [1, 0]])
+    def test_known_two_qubit_gates(self):
+        '''Checks that known two-qubit gates are formed by gate_product with one arg'''
         gate_i = QCSim.Gate()
-        test_product = QCSim.TensorProduct(gate_x, gate_i)
-        actual_product = [np.array([[0,1], [1,0]]), np.array([[1,0], [0,1]])]
-        product_comparison = zip(actual_product, test_product.parts)
-        for gates in product_comparison:
-            np.testing.assert_array_equal(gates[0], gates[1].state)
+        gate_z = QCSim.Gate([[1, 0],
+                             [0, -1]])
+        gate_i_prod_i = gate_i.gate_product(gate_i)
+        gate_i_prod_z = gate_i.gate_product(gate_z)
+        gate_i_squared = QCSim.Gate([[1, 0, 0, 0],
+                                     [0, 1, 0, 0],
+                                     [0, 0, 1, 0],
+                                     [0, 0, 0, 1]])
+        gate_i_times_z = QCSim.Gate([[1, 0, 0, 0],
+                                     [0, -1, 0, 0],
+                                     [0, 0, 1, 0],
+                                     [0, 0, 0, -1]])
+        prod_value_pairs = [(gate_i_prod_i.state, gate_i_squared.state),
+                            (gate_i_prod_z.state, gate_i_times_z.state)]
 
-    def test_qubit_product(self):
-        '''Verifies the tensor product of |0> and |1>'''
+        for test, result in prod_value_pairs:
+            np.testing.assert_array_equal(test, result)
 
-        product_state_01 = [self.test_q0.state, self.test_q1.state]
-        test_product_state_01 = [qubit.state for qubit in QCSim.TensorProduct(self.test_q0, self.test_q1).parts]
-        self.assertEqual(product_state_01, test_product_state_01)
+    def test_two_args_identity(self):
+        '''Checks that the tensor product of two identities with identity works'''
+
+        gate_i = QCSim.Gate()
+        gate_i_cubed = gate_i.gate_product(gate_i, gate_i)
+        gate_should_equal = QCSim.Gate(np.eye(8).tolist())
+
+        np.testing.assert_array_equal(gate_i_cubed.state, gate_should_equal.state)
+
+class GateProductInvalidInput(unittest.TestCase):
+
+    def test_empty_product(self):
+        '''gate_product should fail with no arguments'''
+        self.assertRaises(TypeError, QCSim.Gate().gate_product)
+
+    def test_non_gate_input(self):
+        '''gate_product should fail with non Gate() input.'''
+        not_gates = [2, 16, [1, 2], [[1, 2], [2, 3]], []]
+
+        for candidate in not_gates:
+            self.assertRaises(TypeError, QCSim.Gate().gate_product, candidate)
 
 
 if __name__ == '__main__':
