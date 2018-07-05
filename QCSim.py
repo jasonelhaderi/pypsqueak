@@ -1,18 +1,10 @@
 import numpy as np
+# 1: Write method in Qubit which applies Gates, and scales properly with Tensor Product.
+# 2: Create Measurement class for implementing measurements (start with 1 qubit, then scale up).
+# 3: Build in standard gates and states.
+# 4: Fine tune syntax.
+# 5: Test out 5-Qubit Deutsch-Jozsa Algorithm.
 
-# 1: Add support for printing qubits(DONE), gates(DONE), and tensor products nicely(DONE).
-# 2: Add check to gates that unitary(DONE).
-# 3: Gate class takes an NxN (N even) square unitary matrix as
-#    input(DONE). It has the method gate_product, which takes the tensor product of the gate,
-#    with other Gate() objects passed as arguments(DONE).
-# 4: Qubit class is N dimensional vector (N even), represented in the computational
-#    basis(DONE). Can be initialized by hand, or with qubit_product of multple qubits(DONE).
-# 5: Write method in Qubit which applies Gates, and scales properly with Tensor Product.
-# 6: Create Measurement class for implementing measurements (start with 1 qubit, then scale up).
-# 7: Build in standard gates and states.
-# 8: Fine tune syntax.
-# 9: Test out 5-Qubit Deutsch-Jozsa Algorithm.
-# optional: Remove self.parts from Tensor product?
 
 
 class Qubit:
