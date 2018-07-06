@@ -37,7 +37,6 @@ class QubitValidInput(unittest.TestCase):
             norm_query = cmath.isclose(1, inner_product, rel_tol=10*mach_eps)
             self.assertEqual(True, norm_query)
 
-
 class QubitInvalidInput(unittest.TestCase):
 
     def setUp(self):
@@ -201,6 +200,14 @@ class GateProductValidInput(unittest.TestCase):
         for test, result in prod_value_pairs:
             np.testing.assert_array_equal(test, result)
 
+    def test_empty_product(self):
+        '''gate_product should return self with no arguments'''
+        gate_z = QCSim.Gate([[1, 0],
+                             [0, -1]])
+        gate_empty_arg = gate_z.gate_product()
+
+        np.testing.assert_array_equal(gate_z.state, gate_empty_arg.state)
+
     def test_two_args_identity(self):
         '''Checks that the tensor product of two identities with identity works'''
 
@@ -212,16 +219,93 @@ class GateProductValidInput(unittest.TestCase):
 
 class GateProductInvalidInput(unittest.TestCase):
 
-    def test_empty_product(self):
-        '''gate_product should fail with no arguments'''
-        self.assertRaises(TypeError, QCSim.Gate().gate_product)
-
     def test_non_gate_input(self):
-        '''gate_product should fail with non Gate() input.'''
+        '''gate_product should fail with non Gate() input'''
         not_gates = [2, 16, [1, 2], [[1, 2], [2, 3]], []]
 
         for candidate in not_gates:
             self.assertRaises(TypeError, QCSim.Gate().gate_product, candidate)
+
+#QCSim tests
+
+class QCSimSuccess(unittest.TestCase):
+
+    def setUp(self):
+        # Test gates
+        self.gate_i = QCSim.Gate()
+        self.gate_x = QCSim.Gate([[0, 1],
+                                  [1, 0]])
+        self.gate_H = QCSim.Gate([[1/np.sqrt(2), 1/np.sqrt(2)],
+                                 [1/np.sqrt(2), -1/np.sqrt(2)]])
+
+        # Test machines
+        self.test_qc = QCSim.QCSim()
+
+        self.test_qc_1 = QCSim.QCSim()
+        self.test_qc_1.instr(self.gate_x, 0)
+
+        self.test_qc_001 = QCSim.QCSim()
+        self.test_qc_001.instr(self.gate_i, 2)
+        self.test_qc_001.instr(self.gate_x, 0)
+
+        self.test_qc_100 = QCSim.QCSim()
+        self.test_qc_100.instr(self.gate_x, 2)
+
+
+    def test_known_instr_results(self):
+        test_groups = [(self.gate_x, 0, self.test_qc),
+                      (self.gate_i, 3, self.test_qc_1),
+                      (self.gate_H, 2, self.test_qc_100)]
+        results = [np.array([0, 1]),
+                   np.array([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+                   1/np.sqrt(2) * np.array([1, 0, 0, 0, -1, 0, 0, 0])]
+
+        for i in range(len(test_groups)):
+            # Reset machines
+            self.test_qc = QCSim.QCSim()
+
+            self.test_qc_1 = QCSim.QCSim()
+            self.test_qc_1.instr(self.gate_x, 0)
+            self.test_qc_1.instr(self.gate_i, 3)
+
+            self.test_qc_100 = QCSim.QCSim()
+            self.test_qc_100.instr(self.gate_x, 2)
+
+            # Run instructions
+            test_groups[i][2].instr(test_groups[i][0], test_groups[i][1])
+            np.testing.assert_array_almost_equal(test_groups[i][2].quantum_reg.state, results[i])
+
+    def test_add_distant_qubit(self):
+        '''instr for a non-extant qubit should initialize new filler qubits too'''
+        self.test_qc.instr(self.gate_i, 2)
+        state_000 = np.array([1, 0, 0, 0, 0, 0, 0, 0])
+        np.testing.assert_array_equal(self.test_qc.quantum_reg.state, state_000)
+
+    def test_known_swaps(self):
+        '''Verifies known swaps'''
+
+        state_100 = np.array([0, 0, 0, 0, 1, 0, 0, 0])
+        self.test_qc_001.swap(0, 2)
+        np.testing.assert_array_equal(self.test_qc_001.quantum_reg.state, state_100)
+
+class QCSimFailure(unittest.TestCase):
+
+    def setUp(self):
+        self.test_qc = QCSim.QCSim()
+        self.gate_i = QCSim.Gate()
+        self.gate_x = QCSim.Gate([[0, 1],
+                                  [1, 0]])
+
+    def test_instr_empty_register(self):
+        '''instr must fail when no quantum_reg indicies are specified to operate on'''
+
+        self.assertRaises(TypeError, self.test_qc.instr, self.gate_i)
+
+    def test_gate_and_reg_mismatch(self):
+        '''instr must fail when the number of qubit registers dont match the size of gate'''
+
+        self.assertRaises(QCSim.WrongShapeError, self.test_qc.instr, self.gate_i, 0, 1)
+
 
 
 if __name__ == '__main__':
