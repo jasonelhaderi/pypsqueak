@@ -251,8 +251,25 @@ class QCSimSuccess(unittest.TestCase):
         self.test_qc_100 = QCSim.QCSim()
         self.test_qc_100.instr(self.gate_x, 2)
 
+    def test_known_measurement_results(self):
+        '''Verifies that the proper post-measurement state occurs in several cases'''
+        self.test_qc_1.measure(0)
+        post_measurement_1 = self.test_qc_1.quantum_reg.state
+        self.test_qc_100.measure(0)
+        post_measurement_2 = self.test_qc_100.quantum_reg.state
+        self.test_qc_100.measure(2)
+        post_measurement_3 = self.test_qc_100.quantum_reg.state
+
+        test_results = [post_measurement_1, post_measurement_2, post_measurement_3]
+        correct_results = [np.array([0, 1]),
+                   np.array([0, 0, 0, 0, 1, 0, 0, 0]),
+                   np.array([0, 0, 0, 0, 1, 0, 0, 0])]
+
+        for test_pair in zip(test_results, correct_results):
+            np.testing.assert_array_equal(test_pair[0], test_pair[1])
 
     def test_known_instr_results(self):
+        '''Verifies the output of several known instructions'''
         test_groups = [(self.gate_x, 0, self.test_qc),
                       (self.gate_i, 3, self.test_qc_1),
                       (self.gate_H, 2, self.test_qc_100)]
@@ -301,10 +318,31 @@ class QCSimFailure(unittest.TestCase):
 
         self.assertRaises(TypeError, self.test_qc.instr, self.gate_i)
 
+    def test_instr_negative_loc(self):
+        '''instr must fail when specified register location is negative'''
+
+        self.assertRaises(ValueError, self.test_qc.instr, self.gate_i, -1)
+
+    def test_instr_non_int_loc(self):
+        '''instr must fail when register location isn't integer'''
+
+        self.assertRaises(TypeError, self.test_qc.instr, self.gate_i, 1.1)
+
     def test_gate_and_reg_mismatch(self):
         '''instr must fail when the number of qubit registers dont match the size of gate'''
 
         self.assertRaises(QCSim.WrongShapeError, self.test_qc.instr, self.gate_i, 0, 1)
+
+    def test_swap_non_int_input(self):
+        '''swap should fail with non-integer input'''
+
+        self.assertRaises(TypeError, self.test_qc.swap, *['peas', []])
+
+    def test_negative_reg_loc(self):
+        '''measure must fail with negative registers'''
+
+        self.assertRaises(ValueError, self.test_qc.measure, -1)
+        self.assertRaises(ValueError, self.test_qc.measure, 0, -1)
 
 
 

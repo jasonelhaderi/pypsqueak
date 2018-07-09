@@ -1,14 +1,15 @@
 import numpy as np
-# 0: Clean up and improve unit tests.
+import cmath
 # 1: Make a QCSim class which constitutes a simulated Quantum/Classical
 #    computer simulation.(DONE) It has a quantum_reg(ister) and a classical_reg(ister), both of
 #    arbitrary size.(DONE) The quantum_reg is a list of Qubit objects, and the classical_reg
 #    is a list of binary values. Gates are applied with the instr method(DONE).
-# 3: Create Measurement method in QCSim class.
+# 2: Create Measurement method in QCSim class. (DONE)
+# 3: Improve structure of module.
 # 4: Fine tune syntax.
 # 5: Build in standard gates and states. Write tests for multi-qubit gates.
 # 6: Test out 5-Qubit Deutsch-Jozsa Algorithm.
-# 7: Improve structure of module.
+# 7: Generate QASM and Quil descriptions of code.
 
 class Qubit:
     '''Creates a normalized Qubit object out of some_vector.'''
@@ -19,7 +20,9 @@ class Qubit:
 
         # Initialize qubit.
         self.state = np.array(init_state)
+        self.computational_decomp = {}
         self.normalize()
+        self.decompose_into_comp_basis()
 
     def validate_state(self, some_vector):
         # Checks that some_vector is a list or tuple.
@@ -54,23 +57,37 @@ class Qubit:
         # Changes the state.
         self.state = new_state
         self.normalize()
+        self.decompose_into_comp_basis()
 
     def normalize(self):
         dual_state = np.conjugate(self.state)
         norm = np.sqrt(np.dot(self.state, dual_state))
         self.state = np.multiply(1/norm, self.state)
+        self.decompose_into_comp_basis()
 
-    def print_state(self):
-        # Prints the state in the computational basis.
+    def decompose_into_comp_basis(self):
+        # Generates a dict with basis state labels as keys and amplitudes as values
         padding = len(format(len(self.state), 'b')) - 1
         label = format(0, 'b').zfill(padding)
         amplitude = self.state[0]
-        print("({0:.2e})|{1}>".format(amplitude, label), end='')
+        self.computational_decomp[label] = amplitude
 
         for i in range(1, len(self.state)):
             label = format(i, 'b').zfill(padding)
             amplitude = self.state[i]
-            print(" + ({:.2e})|{}>".format(amplitude, label), end='')
+            self.computational_decomp[label] = amplitude
+
+
+    def print_state(self):
+        # Prints the state in the computational basis.
+        first_term_flag = 0
+        for state_label in self.computational_decomp:
+            if first_term_flag == 0:
+                print("({0:.2e})|{1}>".format(self.computational_decomp[state_label], state_label), end='')
+                first_term_flag = 1
+
+            elif first_term_flag == 1:
+                print(" + ({:.2e})|{}>".format(self.computational_decomp[state_label], state_label), end='')
 
         print('')
 
@@ -145,49 +162,6 @@ class Gate:
     def print_state(self):
         print(self.state)
 
-# class QuantumRegister(Qubit):
-#     '''Data structure for organizing Qubit objects into a working memory.
-#      inherits from Qubit class.'''
-#
-#     def __init__(self, *qubits):
-#         self.memory = []
-#         self.state = None
-#         for qubit in qubits:
-#             self.memory.append(qubit)
-#
-#         self.make_state()
-#
-#     def add_qubit(self, qubit):
-#         self.memory.append(qubit)
-#
-#     def swap(self, i, j):
-#         if i == j:
-#             return None
-#
-#         if i < 0 or j < 0:
-#             raise ValueError('Register locations must be positive.')
-#
-#         if (not isinstance(i, type(int))) or (not isinstance(j, type(int))):
-#             raise ValueError('Register locations must be integer.')
-#
-#         temp_qubit_1 = self.memory[i]
-#         temp_qubit_2 = self.memory[j]
-#
-#         self.memory[i] = temp_qubit_2
-#         self.memory[j] = temp_qubit_1
-#
-#     def update_qubits(self):
-#         pass
-#
-#     def make_state(self):
-#         new_state = self.memory[0]
-#         for i in range(1, len(self.memory)):
-#             new_state = new_state.qubit_product(self.memory[i])
-#
-#         self.state = Qubit(new_state)
-#         self.update_qubits()
-
-
 class QCSim:
     '''Simulation of the action of a quantum/classical computer with arbitrary memory.'''
 
@@ -203,9 +177,19 @@ class QCSim:
         # Check that at least one quantum_reg location is specified for the instruction
         if len(q_reg) == 0:
             raise TypeError('One or more quantum register locations must be specified.')
+
         # Check that the gate size matches the number of quantum_reg locations
         if gate.shape[0] != 2 * len(q_reg):
             raise WrongShapeError('Number of registers must match size of gate.')
+
+        # Check that all the register locations are nonnegative integers
+        for location in q_reg:
+            if not isinstance(location, int):
+                raise TypeError('Quantum register locations must be integer.')
+
+            if location < 0:
+                raise ValueError('Quantum register locations must be nonnegative.')
+
         # If any of the specified quantum_reg locations have not yet been initialized,
         # initialize them (as well as intermediate reg locs) in the |0> state
         if any(q_reg) > self.q_size - 1:
@@ -237,6 +221,8 @@ class QCSim:
             operator = left_eye.gate_product(gate)
 
         self.quantum_reg.state = np.dot(operator.state, self.quantum_reg.state)
+        self.quantum_reg.normalize()
+        self.quantum_reg.decompose_into_comp_basis()
 
         q_flag = 0
         for reg_loc in q_reg:
@@ -245,6 +231,9 @@ class QCSim:
     def swap(self, i, j):
         # Swaps higher of i and j by taking the upper index down abs(i - j) times,
         # and then taking the lower index up abs(i - j) - 1 times
+        if not isinstance(i, int) or not isinstance(j, int):
+            raise TypeError('Input must be integer-valued.')
+
         if i == j:
             return None
 
@@ -302,18 +291,98 @@ class QCSim:
             self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
             self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
 
-    def measure(self):
-        pass
+    def measure(self, q_reg_loc, c_reg_loc=''):
+        # Performs a measurement on the qubit at q_reg_loc in the quantum_reg,
+        # and optionally stores the result at a specified location in the
+        # classical_reg
+
+        # First some sanity checks on the input
+        if not isinstance(q_reg_loc, int):
+            raise TypeError('Quantum register location must be integer-valued.')
+
+        if not isinstance(c_reg_loc, int) and c_reg_loc != '':
+            raise TypeError('Classical register location must be integer-valued.')
+
+        if q_reg_loc < 0:
+            raise ValueError('Quantum register location must be nonnegative.')
+
+        if c_reg_loc != '':
+            if c_reg_loc < 0:
+                raise ValueError('Classical register location must be nonnegative.')
+
+        # Now we determine the result of the measurement from amplitudes in
+        # the computation decomposition that correspond to the qubit at q_reg_loc
+        # being either zero or one
+        amplitudes_for_zero = []
+        amplitudes_for_one = []
+
+        for state_label in self.quantum_reg.computational_decomp:
+            if int(state_label[-1 - q_reg_loc]) == 0:
+                amplitudes_for_zero.append(self.quantum_reg.computational_decomp[state_label])
+
+            if int(state_label[-1 - q_reg_loc]) == 1:
+                amplitudes_for_one.append(self.quantum_reg.computational_decomp[state_label])
+
+        # We then use the sorted amplitudes to generate the probabilities of either
+        # measurement outcome
+        prob_for_zero = 0
+        prob_for_one = 0
+
+        for amplitude in amplitudes_for_zero:
+            prob_for_zero += amplitude * amplitude.conjugate()
+
+        for amplitude in amplitudes_for_one:
+            prob_for_one += amplitude * amplitude.conjugate()
+
+        # Check that total probability remains unity
+        prob_total = prob_for_zero + prob_for_one
+        mach_eps = np.finfo(type(prob_total)).eps
+        if not cmath.isclose(prob_total, 1, rel_tol=10*mach_eps):
+            raise NormalizationError('Sum over outcome probabilities = {}.'.format(prob_total))
+
+        measurement = np.random.choice(2, p=[prob_for_zero, prob_for_one])
+
+        # Optionally store this measurement result in the classical_reg
+        if c_reg_loc != '':
+            # Fills in classical_reg with intermediary zeroes if the c_reg_loc
+            # hasn't yet been initialized
+            if c_reg_loc > (len(self.classical_reg) - 1):
+                difference = c_reg_loc - (len(self.classical_reg) - 1)
+                for i in range(difference):
+                    self.classical_reg.append(0)
+
+            self.classical_reg[c_reg_loc] = measurement
+
+        # Next we project the state of quantum_reg onto the eigenbasis corresponding
+        # to the measurement result with the corresponding projection operator,
+        # which only has nonzero components on the diagonal when represented in
+        # the computational basis
+        projector_diag = []
+        for state_label in self.quantum_reg.computational_decomp:
+            if int(state_label[-1 - q_reg_loc]) == measurement:
+                projector_diag.append(1)
+
+            else:
+                projector_diag.append(0)
+
+        projector_operator = np.diag(projector_diag)
+        new_state = np.dot(projector_operator, self.quantum_reg.state).tolist()
+        # The change_state() method automatically normalizes new_state
+        self.quantum_reg.change_state(new_state)
+
 
     def print_state(self):
         pass
 
 
-# Custom errors.
+# Custom errors
 class WrongShapeError(ValueError):
     pass
 
 class NullVectorError(ValueError):
+    pass
+
+class NormalizationError(ValueError):
     pass
 
 class InhomogenousInputError(TypeError):
@@ -340,13 +409,19 @@ SWAP = Gate([[1, 0, 0, 0],
 
 # Tests
 
-qc = QCSim()
-
-qc.instr(I, 2)
-qc.quantum_reg.print_state()
-qc.instr(H, 0)
-qc.instr(Z, 0)
-qc.quantum_reg.print_state()
+# qc = QCSim()
+#
+# qc.instr(I, 2)
+# qc.quantum_reg.print_state()
+# qc.instr(H, 0)
+# qc.instr(H, 2)
+# qc.instr(Z, 0)
+# print("Before Measurement:")
+# qc.quantum_reg.print_state()
+# qc.measure(0, 0)
+# print(qc.classical_reg[0])
+# print("After Measurement:")
+# qc.quantum_reg.print_state()
 
 
 
