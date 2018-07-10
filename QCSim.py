@@ -1,5 +1,6 @@
 import numpy as np
 import cmath
+
 # 1: Make a QCSim class which constitutes a simulated Quantum/Classical
 #    computer simulation.(DONE) It has a quantum_reg(ister) and a classical_reg(ister), both of
 #    arbitrary size.(DONE) The quantum_reg is a list of Qubit objects, and the classical_reg
@@ -202,11 +203,20 @@ class QCSim:
 
             self.q_size = int(np.log2(len(self.quantum_reg.state)))
 
-        # Swaps operational qubits into order specified by q_reg args
+        # Swaps operational qubits into order specified by q_reg args by first
+        # generating pairs of swaps to make (using a set to avoid duplicates)
         q_flag = 0
+        swap_pairs = set()
         for reg_loc in q_reg:
-            self.swap(q_flag, reg_loc)
+            swap_pairs.add((q_flag, reg_loc))
             q_flag += 1
+
+        # Remove duplicates
+        swap_pairs = set((a,b) if a<=b else (b,a) for a,b in swap_pairs)
+
+        # Perform swaps into operational order
+        for swap_pair in swap_pairs:
+            self.swap(swap_pair[0], swap_pair[1])
 
         # If the gate and size of the quantum register match, just operate with the gate
         if self.q_size == np.log2(gate.shape[0]):
@@ -224,9 +234,9 @@ class QCSim:
         self.quantum_reg.normalize()
         self.quantum_reg.decompose_into_comp_basis()
 
-        q_flag = 0
-        for reg_loc in q_reg:
-            self.swap(q_flag, reg_loc)
+        # Swap qubits back into original order
+        for swap_pair in swap_pairs:
+            self.swap(swap_pair[0], swap_pair[1])
 
     def swap(self, i, j):
         # Swaps higher of i and j by taking the upper index down abs(i - j) times,
@@ -369,11 +379,6 @@ class QCSim:
         new_state = np.dot(projector_operator, self.quantum_reg.state).tolist()
         # The change_state() method automatically normalizes new_state
         self.quantum_reg.change_state(new_state)
-
-
-    def print_state(self):
-        pass
-
 
 # Custom errors
 class WrongShapeError(ValueError):
