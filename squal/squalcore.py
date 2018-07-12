@@ -6,9 +6,9 @@ import cmath
 #    arbitrary size.(DONE) The quantum_reg is a list of Qubit objects, and the classical_reg
 #    is a list of binary values. Gates are applied with the instr method(DONE).
 # 2: Create Measurement method in QCSim class. (DONE)
-# 3: Improve structure of module.
-# 4: Fine tune syntax.
-# 5: Build in standard gates and states. Write tests for multi-qubit gates.
+# 3: Improve structure of module. (DONE)
+# 4: Fine tune syntax by writing a front-end API to interact with the simulation.
+# 5: Build in standard gates as functions. Write tests for multi-qubit gates.
 # 6: Test out 5-Qubit Deutsch-Jozsa Algorithm.
 # 7: Generate QASM and Quil descriptions of code.
 
@@ -44,7 +44,7 @@ class Qubit:
 
         # Checks that the some_vector isn't null, or the null vector.
         elif all(element == 0 for element in some_vector):
-            raise NullVectorError('state cannot be the null vector.')
+            raise NullVectorError('State cannot be the null vector.')
 
         # Checks that some_vector has length 2n with integer n.
         elif len(some_vector) % 2 != 0:

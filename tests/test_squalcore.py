@@ -1,4 +1,4 @@
-import QCSim
+from context import sq
 import unittest
 import numpy as np
 import cmath
@@ -17,7 +17,7 @@ class QubitValidInput(unittest.TestCase):
                     [-25.0, 9j, 3, 5]]
 
     def setUp(self):
-        self.test_qubit = QCSim.Qubit()
+        self.test_qubit = sq.Qubit()
 
     def test_normalize_valid_input(self):
         '''normalize should rescale valid new states to be unit vectors'''
@@ -41,7 +41,7 @@ class QubitValidInput(unittest.TestCase):
         '''Verifies proper result for qubit_product'''
 
         product_state_01 = np.array([0, 1, 0, 0])
-        q1 = QCSim.Qubit([0, 1])
+        q1 = sq.Qubit([0, 1])
         test_product_state_01 = self.test_qubit.qubit_product(q1)
 
         np.testing.assert_array_equal(product_state_01, test_product_state_01.state)
@@ -49,7 +49,7 @@ class QubitValidInput(unittest.TestCase):
 class QubitInvalidInput(unittest.TestCase):
 
     def setUp(self):
-        self.test_qubit = QCSim.Qubit()
+        self.test_qubit = sq.Qubit()
 
     def test_not_list_or_tuple(self):
         '''validate_state should fail for non-list or -tuple input'''
@@ -81,7 +81,7 @@ class QubitInvalidInput(unittest.TestCase):
         wrong_length = [[0, 1, 34],
                         [7]]
         for candidate in wrong_length:
-            self.assertRaises(QCSim.WrongShapeError, self.test_qubit.validate_state, candidate)
+            self.assertRaises(sq.WrongShapeError, self.test_qubit.validate_state, candidate)
 
     def test_zero_vector(self):
         '''validate_state should fail for the null vector, list, and tuple'''
@@ -90,12 +90,12 @@ class QubitInvalidInput(unittest.TestCase):
                         [],
                         ()]
         for null_vec in null_vectors:
-            self.assertRaises(QCSim.NullVectorError, self.test_qubit.validate_state, null_vec)
+            self.assertRaises(sq.NullVectorError, self.test_qubit.validate_state, null_vec)
 
     def test_empty_input_qubit_product(self):
         '''qubit_product with empty argument should raise a TypeError'''
 
-        self.assertRaises(TypeError, QCSim.Qubit().qubit_product)
+        self.assertRaises(TypeError, sq.Qubit().qubit_product)
 
 # Gate tests
 
@@ -112,10 +112,10 @@ class GateValidInput(unittest.TestCase):
     valid_gates = [X, Y, Z, I]
 
     def setUp(self):
-        self.gate_x = QCSim.Gate(self.X.tolist())
-        self.gate_y = QCSim.Gate(self.Y.tolist())
-        self.gate_z = QCSim.Gate(self.Z.tolist())
-        self.gate_i = QCSim.Gate()
+        self.gate_x = sq.Gate(self.X.tolist())
+        self.gate_y = sq.Gate(self.Y.tolist())
+        self.gate_z = sq.Gate(self.Z.tolist())
+        self.gate_i = sq.Gate()
 
     def test_pauli_gates(self):
         '''Basic Pauli matricies should initialize correctly'''
@@ -137,7 +137,7 @@ class GateInvalidInput(unittest.TestCase):
                             None]
 
         for candidate in not_list_of_rows:
-            self.assertRaises(ValueError, QCSim.Gate, candidate)
+            self.assertRaises(ValueError, sq.Gate, candidate)
 
     def test_not_square(self):
         '''Gate should fail to initialize if input doesn't have shape (n, n)'''
@@ -151,7 +151,7 @@ class GateInvalidInput(unittest.TestCase):
                          ([1, 2],
                           (1, 2, 3))]
         for candidate in wrong_shapes:
-            self.assertRaises(QCSim.WrongShapeError, QCSim.Gate, candidate)
+            self.assertRaises(sq.WrongShapeError, sq.Gate, candidate)
 
     def test_not_even(self):
         '''Gate should fail if matrix is not 2nX2n for integer n'''
@@ -160,7 +160,7 @@ class GateInvalidInput(unittest.TestCase):
                          [0, 1, 0],
                          [0, 0, 1]]
 
-        self.assertRaises(QCSim.WrongShapeError, QCSim.Gate, uneven_shape)
+        self.assertRaises(sq.WrongShapeError, sq.Gate, uneven_shape)
 
     def test_not_unitary(self):
         '''Gate should fail to initialize non-unitary matrix'''
@@ -178,23 +178,23 @@ class GateInvalidInput(unittest.TestCase):
 
         non_unitary_matricies = [M1, M2, M3, M4]
         for matrix in non_unitary_matricies:
-            self.assertRaises(QCSim.NonUnitaryInputError, QCSim.Gate, matrix)
+            self.assertRaises(sq.NonUnitaryInputError, sq.Gate, matrix)
 
 class GateProductValidInput(unittest.TestCase):
 
     def test_known_two_qubit_gates(self):
         '''Checks that known two-qubit gates are formed by gate_product with one arg'''
 
-        gate_i = QCSim.Gate()
-        gate_z = QCSim.Gate([[1, 0],
+        gate_i = sq.Gate()
+        gate_z = sq.Gate([[1, 0],
                              [0, -1]])
         gate_i_prod_i = gate_i.gate_product(gate_i)
         gate_i_prod_z = gate_i.gate_product(gate_z)
-        gate_i_squared = QCSim.Gate([[1, 0, 0, 0],
+        gate_i_squared = sq.Gate([[1, 0, 0, 0],
                                      [0, 1, 0, 0],
                                      [0, 0, 1, 0],
                                      [0, 0, 0, 1]])
-        gate_i_times_z = QCSim.Gate([[1, 0, 0, 0],
+        gate_i_times_z = sq.Gate([[1, 0, 0, 0],
                                      [0, -1, 0, 0],
                                      [0, 0, 1, 0],
                                      [0, 0, 0, -1]])
@@ -207,7 +207,7 @@ class GateProductValidInput(unittest.TestCase):
     def test_empty_product(self):
         '''gate_product should return self with no arguments'''
 
-        gate_z = QCSim.Gate([[1, 0],
+        gate_z = sq.Gate([[1, 0],
                              [0, -1]])
         gate_empty_arg = gate_z.gate_product()
 
@@ -216,9 +216,9 @@ class GateProductValidInput(unittest.TestCase):
     def test_two_args_identity(self):
         '''Checks that the tensor product of two identities with identity works'''
 
-        gate_i = QCSim.Gate()
+        gate_i = sq.Gate()
         gate_i_cubed = gate_i.gate_product(gate_i, gate_i)
-        gate_should_equal = QCSim.Gate(np.eye(8).tolist())
+        gate_should_equal = sq.Gate(np.eye(8).tolist())
 
         np.testing.assert_array_equal(gate_i_cubed.state, gate_should_equal.state)
 
@@ -230,7 +230,7 @@ class GateProductInvalidInput(unittest.TestCase):
         not_gates = [2, 16, [1, 2], [[1, 2], [2, 3]], []]
 
         for candidate in not_gates:
-            self.assertRaises(TypeError, QCSim.Gate().gate_product, candidate)
+            self.assertRaises(TypeError, sq.Gate().gate_product, candidate)
 
 #QCSim tests
 
@@ -238,23 +238,23 @@ class QCSimSuccess(unittest.TestCase):
 
     def setUp(self):
         # Test gates
-        self.gate_i = QCSim.Gate()
-        self.gate_x = QCSim.Gate([[0, 1],
+        self.gate_i = sq.Gate()
+        self.gate_x = sq.Gate([[0, 1],
                                   [1, 0]])
-        self.gate_H = QCSim.Gate([[1/np.sqrt(2), 1/np.sqrt(2)],
+        self.gate_H = sq.Gate([[1/np.sqrt(2), 1/np.sqrt(2)],
                                  [1/np.sqrt(2), -1/np.sqrt(2)]])
 
         # Test machines
-        self.test_qc = QCSim.QCSim()
+        self.test_qc = sq.QCSim()
 
-        self.test_qc_1 = QCSim.QCSim()
+        self.test_qc_1 = sq.QCSim()
         self.test_qc_1.instr(self.gate_x, 0)
 
-        self.test_qc_001 = QCSim.QCSim()
+        self.test_qc_001 = sq.QCSim()
         self.test_qc_001.instr(self.gate_i, 2)
         self.test_qc_001.instr(self.gate_x, 0)
 
-        self.test_qc_100 = QCSim.QCSim()
+        self.test_qc_100 = sq.QCSim()
         self.test_qc_100.instr(self.gate_x, 2)
 
     def test_known_measurement_results(self):
@@ -287,13 +287,13 @@ class QCSimSuccess(unittest.TestCase):
 
         for i in range(len(test_groups)):
             # Reset machines
-            self.test_qc = QCSim.QCSim()
+            self.test_qc = sq.QCSim()
 
-            self.test_qc_1 = QCSim.QCSim()
+            self.test_qc_1 = sq.QCSim()
             self.test_qc_1.instr(self.gate_x, 0)
             self.test_qc_1.instr(self.gate_i, 3)
 
-            self.test_qc_100 = QCSim.QCSim()
+            self.test_qc_100 = sq.QCSim()
             self.test_qc_100.instr(self.gate_x, 2)
 
             # Run instructions
@@ -325,12 +325,12 @@ class QCSimSuccess(unittest.TestCase):
 class QCSimFailure(unittest.TestCase):
 
     def setUp(self):
-        self.gate_i = QCSim.Gate()
-        self.gate_x = QCSim.Gate([[0, 1],
+        self.gate_i = sq.Gate()
+        self.gate_x = sq.Gate([[0, 1],
                                   [1, 0]])
 
-        self.test_qc = QCSim.QCSim()
-        self.test_qc_001 = QCSim.QCSim()
+        self.test_qc = sq.QCSim()
+        self.test_qc_001 = sq.QCSim()
         self.test_qc_001.instr(self.gate_i, 2)
 
     def test_instr_empty_register(self):
@@ -351,7 +351,7 @@ class QCSimFailure(unittest.TestCase):
     def test_gate_and_reg_mismatch(self):
         '''instr must fail when the number of qubit registers dont match the size of gate'''
 
-        self.assertRaises(QCSim.WrongShapeError, self.test_qc.instr, self.gate_i, 0, 1)
+        self.assertRaises(sq.WrongShapeError, self.test_qc.instr, self.gate_i, 0, 1)
 
     def test_duplicate_q_reg_locs(self):
         '''instr must fail when duplicate operational register locations are specified'''
