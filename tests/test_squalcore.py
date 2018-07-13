@@ -1,4 +1,4 @@
-from context import sq
+from context import sq # squalcore module
 import unittest
 import numpy as np
 import cmath
@@ -20,7 +20,7 @@ class QubitValidInput(unittest.TestCase):
         self.test_qubit = sq.Qubit()
 
     def test_normalize_valid_input(self):
-        '''normalize should rescale valid new states to be unit vectors'''
+        '''self.__normalize() should rescale valid new states to be unit vectors'''
 
         for vec in self.valid_qubits:
             # get machine epsilon for relative error
@@ -28,23 +28,23 @@ class QubitValidInput(unittest.TestCase):
 
             # change state and compute inner product
             self.test_qubit.change_state(vec)
-            state_dual = np.conjugate(self.test_qubit.state)
+            state_dual = np.conjugate(self.test_qubit.state())
 
             # if inner product != 1, then test_qubit.normalize() failed
-            inner_product = np.dot(self.test_qubit.state, state_dual)
+            inner_product = np.dot(self.test_qubit.state(), state_dual)
 
             # cmath is used so we don't discard errors in the imaginary part
             norm_query = cmath.isclose(1, inner_product, rel_tol=10*mach_eps)
             self.assertTrue(norm_query)
 
     def test_known_qubit_product(self):
-        '''Verifies proper result for qubit_product'''
+        '''Verifies proper result for self.qubit_product()'''
 
         product_state_01 = np.array([0, 1, 0, 0])
         q1 = sq.Qubit([0, 1])
         test_product_state_01 = self.test_qubit.qubit_product(q1)
 
-        np.testing.assert_array_equal(product_state_01, test_product_state_01.state)
+        np.testing.assert_array_equal(product_state_01, test_product_state_01.state())
 
 class QubitInvalidInput(unittest.TestCase):
 
@@ -52,16 +52,16 @@ class QubitInvalidInput(unittest.TestCase):
         self.test_qubit = sq.Qubit()
 
     def test_not_list_or_tuple(self):
-        '''validate_state should fail for non-list or -tuple input'''
+        '''self.__validate_state.() should fail for self.change_state(non-list or -tuple)'''
 
         not_list_or_tuple = [{'key':'value'},
                              4,
                              'string']
         for candidate in not_list_or_tuple:
-            self.assertRaises(TypeError, self.test_qubit.validate_state, candidate)
+            self.assertRaises(TypeError, self.test_qubit.change_state, candidate)
 
     def test_non_numeric_elements(self):
-        '''validate_state should fail for input with non-numeric elements'''
+        '''self.__validate_state.() should fail for self.change_state(list with non-numeric elements)'''
 
         non_numeric_elements = [['string'],
                                 [['string'], ['string']],
@@ -73,24 +73,24 @@ class QubitInvalidInput(unittest.TestCase):
                                 [{'key':'value'}, {'key':'value'}],
                                 [(24, 35), (-2)]]
         for candidate in non_numeric_elements:
-            self.assertRaises(TypeError, self.test_qubit.validate_state, candidate)
+            self.assertRaises(TypeError, self.test_qubit.change_state, candidate)
 
     def test_wrong_length(self):
-        '''validate_state should fail for input with length not even'''
+        '''self.__validate_state.() should fail for self.change_state(input with length not even)'''
 
         wrong_length = [[0, 1, 34],
                         [7]]
         for candidate in wrong_length:
-            self.assertRaises(sq.WrongShapeError, self.test_qubit.validate_state, candidate)
+            self.assertRaises(sq.WrongShapeError, self.test_qubit.change_state, candidate)
 
     def test_zero_vector(self):
-        '''validate_state should fail for the null vector, list, and tuple'''
+        '''self.__validate_state.() should fail for self.change_state(null vector, list, or tuple)'''
 
         null_vectors = [[0, 0],
                         [],
                         ()]
         for null_vec in null_vectors:
-            self.assertRaises(sq.NullVectorError, self.test_qubit.validate_state, null_vec)
+            self.assertRaises(sq.NullVectorError, self.test_qubit.change_state, null_vec)
 
     def test_empty_input_qubit_product(self):
         '''qubit_product with empty argument should raise a TypeError'''
@@ -124,7 +124,7 @@ class GateValidInput(unittest.TestCase):
         test_gates = zip(self.valid_gates, test_gates)
 
         for gate in test_gates:
-            np.testing.assert_array_equal(gate[0], gate[1].state)
+            np.testing.assert_array_equal(gate[0], gate[1].state())
 
 class GateInvalidInput(unittest.TestCase):
 
@@ -187,19 +187,19 @@ class GateProductValidInput(unittest.TestCase):
 
         gate_i = sq.Gate()
         gate_z = sq.Gate([[1, 0],
-                             [0, -1]])
+                          [0, -1]])
         gate_i_prod_i = gate_i.gate_product(gate_i)
         gate_i_prod_z = gate_i.gate_product(gate_z)
         gate_i_squared = sq.Gate([[1, 0, 0, 0],
-                                     [0, 1, 0, 0],
-                                     [0, 0, 1, 0],
-                                     [0, 0, 0, 1]])
+                                  [0, 1, 0, 0],
+                                  [0, 0, 1, 0],
+                                  [0, 0, 0, 1]])
         gate_i_times_z = sq.Gate([[1, 0, 0, 0],
-                                     [0, -1, 0, 0],
-                                     [0, 0, 1, 0],
-                                     [0, 0, 0, -1]])
-        prod_value_pairs = [(gate_i_prod_i.state, gate_i_squared.state),
-                            (gate_i_prod_z.state, gate_i_times_z.state)]
+                                  [0, -1, 0, 0],
+                                  [0, 0, 1, 0],
+                                  [0, 0, 0, -1]])
+        prod_value_pairs = [(gate_i_prod_i.state(), gate_i_squared.state()),
+                            (gate_i_prod_z.state(), gate_i_times_z.state())]
 
         for test, result in prod_value_pairs:
             np.testing.assert_array_equal(test, result)
@@ -208,10 +208,10 @@ class GateProductValidInput(unittest.TestCase):
         '''gate_product should return self with no arguments'''
 
         gate_z = sq.Gate([[1, 0],
-                             [0, -1]])
+                          [0, -1]])
         gate_empty_arg = gate_z.gate_product()
 
-        np.testing.assert_array_equal(gate_z.state, gate_empty_arg.state)
+        np.testing.assert_array_equal(gate_z.state(), gate_empty_arg.state())
 
     def test_two_args_identity(self):
         '''Checks that the tensor product of two identities with identity works'''
@@ -220,7 +220,7 @@ class GateProductValidInput(unittest.TestCase):
         gate_i_cubed = gate_i.gate_product(gate_i, gate_i)
         gate_should_equal = sq.Gate(np.eye(8).tolist())
 
-        np.testing.assert_array_equal(gate_i_cubed.state, gate_should_equal.state)
+        np.testing.assert_array_equal(gate_i_cubed.state(), gate_should_equal.state())
 
 class GateProductInvalidInput(unittest.TestCase):
 
@@ -240,9 +240,9 @@ class QCSimSuccess(unittest.TestCase):
         # Test gates
         self.gate_i = sq.Gate()
         self.gate_x = sq.Gate([[0, 1],
-                                  [1, 0]])
+                               [1, 0]])
         self.gate_H = sq.Gate([[1/np.sqrt(2), 1/np.sqrt(2)],
-                                 [1/np.sqrt(2), -1/np.sqrt(2)]])
+                               [1/np.sqrt(2), -1/np.sqrt(2)]])
 
         # Test machines
         self.test_qc = sq.QCSim()
@@ -261,11 +261,11 @@ class QCSimSuccess(unittest.TestCase):
         '''Verifies that the proper post-measurement state occurs in several cases'''
 
         self.test_qc_1.measure(0)
-        post_measurement_1 = self.test_qc_1.quantum_reg.state
+        post_measurement_1 = self.test_qc_1.quantum_reg()
         self.test_qc_100.measure(0)
-        post_measurement_2 = self.test_qc_100.quantum_reg.state
+        post_measurement_2 = self.test_qc_100.quantum_reg()
         self.test_qc_100.measure(2)
-        post_measurement_3 = self.test_qc_100.quantum_reg.state
+        post_measurement_3 = self.test_qc_100.quantum_reg()
 
         test_results = [post_measurement_1, post_measurement_2, post_measurement_3]
         correct_results = [np.array([0, 1]),
@@ -298,14 +298,14 @@ class QCSimSuccess(unittest.TestCase):
 
             # Run instructions
             test_groups[i][2].instr(test_groups[i][0], test_groups[i][1])
-            np.testing.assert_array_almost_equal(test_groups[i][2].quantum_reg.state, results[i])
+            np.testing.assert_array_almost_equal(test_groups[i][2].quantum_reg(), results[i])
 
     def test_add_distant_qubit(self):
         '''instr for a non-extant qubit should initialize new filler qubits too'''
 
         self.test_qc.instr(self.gate_i, 2)
         state_000 = np.array([1, 0, 0, 0, 0, 0, 0, 0])
-        np.testing.assert_array_equal(self.test_qc.quantum_reg.state, state_000)
+        np.testing.assert_array_equal(self.test_qc.quantum_reg(), state_000)
 
     def test_known_swaps(self):
         '''Verifies known swaps'''
@@ -316,8 +316,8 @@ class QCSimSuccess(unittest.TestCase):
         self.test_qc_100.swap(1, 2)
         state_010 = np.array([0, 0, 1, 0, 0, 0, 0, 0])
 
-        test_pairs = [(self.test_qc_001.quantum_reg.state, state_100),
-                      (self.test_qc_100.quantum_reg.state, state_010)]
+        test_pairs = [(self.test_qc_001.quantum_reg(), state_100),
+                      (self.test_qc_100.quantum_reg(), state_010)]
 
         for pair in test_pairs:
             np.testing.assert_array_equal(pair[0], pair[1])

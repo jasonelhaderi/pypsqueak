@@ -1,30 +1,34 @@
 import numpy as np
+import copy
 import cmath
 
-# 1: Make a QCSim class which constitutes a simulated Quantum/Classical
-#    computer simulation.(DONE) It has a quantum_reg(ister) and a classical_reg(ister), both of
-#    arbitrary size.(DONE) The quantum_reg is a list of Qubit objects, and the classical_reg
-#    is a list of binary values. Gates are applied with the instr method(DONE).
-# 2: Create Measurement method in QCSim class. (DONE)
-# 3: Improve structure of module. (DONE)
-# 4: Fine tune syntax by writing a front-end API to interact with the simulation.
-# 5: Build in standard gates as functions. Write tests for multi-qubit gates.
-# 6: Test out 5-Qubit Deutsch-Jozsa Algorithm.
-# 7: Generate QASM and Quil descriptions of code.
+# 1: Fine tune syntax by writing a front-end API to interact with the simulation.
+#    (a) Change the Gate class so that it has the attribute target_qubit, so that
+#    the functions in gates.py return Gate objects. Adapt QCSim and unit tests
+#    accordingly.
+#    (b) Flesh out Program class in API with means of doing measurement
+#    (key word in add_instr perhaps).
+#    (c) Decide on means for delivering a Program's contents to a QCSim.
+#    (d) Change order of classical register to mirror quantum register.
+#    (e) There's a bug somewhere in __repr__ for QCSim.
+# 2: Build in standard gates as functions. Write tests for multi-qubit gates.
+# 3: Test out 5-Qubit Deutsch-Jozsa Algorithm.
+# 4: Implement noise modeling.
+# 4: Generate QASM and Quil descriptions of code.
 
 class Qubit:
     '''Creates a normalized Qubit object out of some_vector.'''
 
     def __init__(self, init_state = [1, 0]):
         # Checks that input is valid.
-        self.validate_state(init_state)
+        self.__validate_state(init_state)
 
         # Initialize qubit.
-        self.state = np.array(init_state)
-        self.normalize()
-        self.decompose_into_comp_basis()
+        self.__state = np.array(init_state)
+        self.__normalize()
+        self.__decompose_into_comp_basis()
 
-    def validate_state(self, some_vector):
+    def __validate_state(self, some_vector):
         # Checks that some_vector is a list or tuple.
         if type(some_vector) != list and type(some_vector) != tuple:
             raise TypeError('Input state must be a list or tuple.')
@@ -52,70 +56,84 @@ class Qubit:
 
     def change_state(self, new_state):
         # Checks that input is valid.
-        self.validate_state(new_state)
+        self.__validate_state(new_state)
 
         # Changes the state.
-        self.state = np.array(new_state)
-        self.normalize()
-        self.decompose_into_comp_basis()
+        self.__state = np.array(new_state)
+        self.__normalize()
+        self.__decompose_into_comp_basis()
 
-    def normalize(self):
-        dual_state = np.conjugate(self.state)
-        norm = np.sqrt(np.dot(self.state, dual_state))
-        self.state = np.multiply(1/norm, self.state)
-        self.decompose_into_comp_basis()
+    def state(self):
+        '''
+        Returns a copy of self.__state for use in operations.
+        '''
 
-    def decompose_into_comp_basis(self):
+        return np.copy(self.__state)
+
+    def computational_decomp(self):
+        '''
+        Returns a copy of self.__computational_decomp for use in operations.
+        '''
+
+        return copy.deepcopy(self.__computational_decomp)
+
+    def __normalize(self):
+        dual_state = np.conjugate(self.__state)
+        norm = np.sqrt(np.dot(self.__state, dual_state))
+        self.__state = np.multiply(1/norm, self.__state)
+        self.__decompose_into_comp_basis()
+
+    def __decompose_into_comp_basis(self):
         # Generates a dict with basis state labels as keys and amplitudes as values
-        self.computational_decomp = {}
-        padding = len(format(len(self.state), 'b')) - 1
+        self.__computational_decomp = {}
+        padding = len(format(len(self.__state), 'b')) - 1
         label = format(0, 'b').zfill(padding)
-        amplitude = self.state[0]
-        self.computational_decomp[label] = amplitude
+        amplitude = self.__state[0]
+        self.__computational_decomp[label] = amplitude
 
-        for i in range(1, len(self.state)):
+        for i in range(1, len(self.__state)):
             label = format(i, 'b').zfill(padding)
-            amplitude = self.state[i]
-            self.computational_decomp[label] = amplitude
+            amplitude = self.__state[i]
+            self.__computational_decomp[label] = amplitude
 
     def __len__(self):
         # Note that this returns the number of qubits that the given Qubit object
         # corresponds to, not the number of components its vector representation has
-        return int(np.log2(len(self.state)))
+        return int(np.log2(len(self.__state)))
 
     def __repr__(self):
-        return str(self.state)
+        return str(self.__state)
 
     def __str__(self):
         # Generates a string representation of the state in the computational basis
         first_term_flag = 0
         state_rep = ""
-        for state_label in self.computational_decomp:
+        for state_label in self.__computational_decomp:
             if first_term_flag == 0:
-                state_rep += "({0:.2e})|{1}>".format(self.computational_decomp[state_label], state_label)
+                state_rep += "({0:.2e})|{1}>".format(self.__computational_decomp[state_label], state_label)
                 first_term_flag = 1
 
             elif first_term_flag == 1:
-                state_rep += " + ({:.2e})|{}>".format(self.computational_decomp[state_label], state_label)
+                state_rep += " + ({:.2e})|{}>".format(self.__computational_decomp[state_label], state_label)
 
         return state_rep
 
     def qubit_product(self, *arg):
         if len(arg) == 0:
             raise TypeError('Input cannot be empty.')
-        new_qubits = self.state
+        new_qubits = self.__state
 
         for argument in arg:
             if not isinstance(argument, type(Qubit())):
                 raise TypeError('Arguments must be Qubit() objects.')
 
         if len(arg) == 1:
-            new_qubits = np.kron(new_qubits, arg[0].state)
+            new_qubits = np.kron(new_qubits, arg[0].state())
             return Qubit(new_qubits.tolist())
 
         if len(arg) > 1:
             for argument in arg:
-                new_qubits = np.kron(new_qubits, argument.state)
+                new_qubits = np.kron(new_qubits, argument.state())
             return Qubit(new_qubits.tolist())
 
 class Gate:
@@ -132,26 +150,35 @@ class Gate:
             raise ValueError('Elements of input must be list or tuple.')
 
         # Checks that the input is a square matrix
-        self.shape = (len(some_matrix), len(some_matrix[0]))
-        if self.shape[0] % 2 != 0:
+        self.__shape = (len(some_matrix), len(some_matrix[0]))
+        if self.__shape[0] % 2 != 0:
             raise WrongShapeError('Gate must be nXn with even n.')
 
         for row in some_matrix:
-            if len(row) != self.shape[0]:
+            if len(row) != self.__shape[0]:
                 raise WrongShapeError('Gate must be a square matrix.')
 
         # Initialize the gate
-        self.state = np.array(some_matrix)
+        self.__state = np.array(some_matrix)
 
         # Checks that the input is unitary
-        product_with_conj = np.dot(self.state.conj().T, self.state)
-        is_unitary = np.allclose(product_with_conj, np.eye(self.shape[0]))
+        product_with_conj = np.dot(self.__state.conj().T, self.__state)
+        is_unitary = np.allclose(product_with_conj, np.eye(self.__shape[0]))
         if is_unitary == False:
             raise NonUnitaryInputError('Gate must be unitary.')
 
+    def state(self):
+        '''
+        Returns a copy of self.__state for use in operations.
+        '''
+        return np.copy(self.__state)
+
+    def shape(self):
+        return copy.deepcopy(self.__shape)
+
     def gate_product(self, *arg):
         # Returns the a Gate() that is the Kronecker product of self and *args
-        new_gate = self.state
+        new_gate = self.__state
         if len(arg) == 0:
             return Gate(new_gate.tolist())
 
@@ -160,21 +187,21 @@ class Gate:
                 raise TypeError('Arguments must be Gate() objects.')
 
         if len(arg) == 1:
-            new_gate = np.kron(new_gate, arg[0].state)
+            new_gate = np.kron(new_gate, arg[0].state())
             return Gate(new_gate.tolist())
 
         if len(arg) > 1:
             for argument in arg:
-                new_gate = np.kron(new_gate, argument.state)
+                new_gate = np.kron(new_gate, argument.state())
             return Gate(new_gate.tolist())
 
     def __len__(self):
         # Note that this returns the number of qubits the gate acts on, NOT the
         # size of matrix representation
-        return int(np.log2(self.shape[0]))
+        return int(np.log2(self.__shape[0]))
 
     def __repr__(self):
-        return str(self.state)
+        return str(self.__state)
 
 class QCSim:
     '''Simulation of the action of a quantum/classical computer with arbitrary memory.'''
@@ -182,10 +209,10 @@ class QCSim:
     def __init__(self):
         # Initalizes with one Qubit in the |0> state in the zeroeth
         # quantum_reg location, and a 0 in the zeroeth classical_reg location
-        self.quantum_reg = Qubit()
-        self.classical_reg = [0]
-        self.q_size = 1
-        self.c_size = 1
+        self.__quantum_reg = Qubit()
+        self.__classical_reg = [0]
+        self.__q_size = 1
+        self.__c_size = 1
 
     def instr(self, gate, *q_reg):
         # Check that at least one quantum_reg location is specified for the instruction
@@ -210,14 +237,14 @@ class QCSim:
 
         # If any of the specified quantum_reg locations have not yet been initialized,
         # initialize them (as well as intermediate reg locs) in the |0> state
-        if any(q_reg) > self.q_size - 1:
-            n_new_registers = max(q_reg) - (self.q_size - 1)
+        if any(q_reg) > self.__q_size - 1:
+            n_new_registers = max(q_reg) - (self.__q_size - 1)
             new_register = Qubit()
             for i in range(n_new_registers - 1):
                 new_register = new_register.qubit_product(Qubit())
 
-            self.quantum_reg = new_register.qubit_product(self.quantum_reg)
-            self.q_size = len(self.quantum_reg)
+            self.__quantum_reg = new_register.qubit_product(self.__quantum_reg)
+            self.__q_size = len(self.__quantum_reg)
 
         # Swaps operational qubits into order specified by q_reg args by first
         # generating pairs of swaps to make (using a set to avoid duplicates)
@@ -236,22 +263,24 @@ class QCSim:
             self.swap(swap_pair[0], swap_pair[1])
 
         # If the gate and size of the quantum register match, just operate with the gate
-        if self.q_size == len(gate):
+        if self.__q_size == len(gate):
             operator = gate
 
         # If the register size is larger, we need to raise the gate (I^n tensored with gate,
         # since operational order means the operational qubits are ordered into the lowest
         # q_reg_locs)
-        elif self.q_size > len(gate):
+        elif self.__q_size > len(gate):
             left_eye = I
-            for i in range(self.q_size - len(gate) - 1):
+            for i in range(self.__q_size - len(gate) - 1):
                 left_eye = left_eye.gate_product(I)
 
             operator = left_eye.gate_product(gate)
 
-        self.quantum_reg.state = np.dot(operator.state, self.quantum_reg.state)
-        self.quantum_reg.normalize()
-        self.quantum_reg.decompose_into_comp_basis()
+        new_reg_state = np.dot(operator.state(), self.__quantum_reg.state())
+        self.__quantum_reg.change_state(new_reg_state.tolist())
+        # self.quantum_reg.state() = np.dot(operator.state, self.quantum_reg.state)
+        # self.quantum_reg.normalize()
+        # self.quantum_reg.decompose_into_comp_basis()
 
         # Swap qubits back into original order
         for swap_pair in swap_pairs:
@@ -276,7 +305,7 @@ class QCSim:
             simple_lower = upper_index - (1 + k)
             simple_upper = upper_index - k
 
-            self.elementary_swap(simple_lower, simple_upper)
+            self.__elementary_swap(simple_lower, simple_upper)
 
         # Bring lower up with (difference - 1) elementary swaps (left prepends SWAP, right post)
         for k in range(difference - 1):
@@ -284,20 +313,20 @@ class QCSim:
             simple_lower = lower_index + (1 + k)
             simple_upper = lower_index + (2 + k)
 
-            self.elementary_swap(simple_lower, simple_upper)
+            self.__elementary_swap(simple_lower, simple_upper)
 
-    def elementary_swap(self, simple_lower, simple_upper):
+    def __elementary_swap(self, simple_lower, simple_upper):
         # Raise ValueError if swap indicies reference location in the quantum_reg
         # that doesn't exist
-        if simple_lower < 0 or simple_lower > (self.q_size - 1):
+        if simple_lower < 0 or simple_lower > (self.__q_size - 1):
             raise ValueError("One or more register locations specified in swap doesn't exist.")
 
-        if simple_upper < 0 or simple_upper > (self.q_size - 1):
+        if simple_upper < 0 or simple_upper > (self.__q_size - 1):
             raise ValueError("One or more register locations specified in swap doesn't exist.")
 
         # Note that lower index corresponds to right-hand factors, upper index to left-hand
         number_right_eye = int(simple_lower)
-        number_left_eye = int(self.q_size - simple_upper - 1)
+        number_left_eye = int(self.__q_size - simple_upper - 1)
 
         if number_left_eye > 0 and number_right_eye > 0:
             # Prep identity factors
@@ -305,29 +334,37 @@ class QCSim:
             right_eye = I.gate_product(*[I for l in range(number_right_eye - 1)])
 
             raised_SWAP = left_eye.gate_product(SWAP, right_eye)
-            self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
-            self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
+            new_swap_state = np.dot(raised_SWAP.state(), self.__quantum_reg.state())
+            self.__quantum_reg.change_state(new_swap_state.tolist())
+            # self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
+            # self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
 
         elif number_left_eye > 0 and number_right_eye == 0:
             # Prep identity factors
             left_eye = I.gate_product(*[I for l in range(number_left_eye - 1)])
 
             raised_SWAP = left_eye.gate_product(SWAP)
-            self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
-            self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
+            new_swap_state = np.dot(raised_SWAP.state(), self.__quantum_reg.state())
+            self.__quantum_reg.change_state(new_swap_state.tolist())
+            # self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
+            # self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
 
         elif number_left_eye == 0 and number_right_eye > 0:
             # Prep identity factors
             right_eye = I.gate_product(*[I for l in range(number_right_eye - 1)])
 
             raised_SWAP = SWAP.gate_product(right_eye)
-            self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
-            self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
+            new_swap_state = np.dot(raised_SWAP.state(), self.__quantum_reg.state())
+            self.__quantum_reg.change_state(new_swap_state.tolist())
+            # self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
+            # self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
 
         elif number_left_eye == 0 and number_right_eye == 0:
             raised_SWAP = SWAP
-            self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
-            self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
+            new_swap_state = np.dot(raised_SWAP.state(), self.__quantum_reg.state())
+            self.__quantum_reg.change_state(new_swap_state.tolist())
+            # self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
+            # self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
 
     def measure(self, q_reg_loc, c_reg_loc=''):
         # Performs a measurement on the qubit at q_reg_loc in the quantum_reg,
@@ -354,12 +391,13 @@ class QCSim:
         amplitudes_for_zero = []
         amplitudes_for_one = []
 
-        for state_label in self.quantum_reg.computational_decomp:
+        basis_states = self.__quantum_reg.computational_decomp()
+        for state_label in basis_states:
             if int(state_label[-1 - q_reg_loc]) == 0:
-                amplitudes_for_zero.append(self.quantum_reg.computational_decomp[state_label])
+                amplitudes_for_zero.append(basis_states[state_label])
 
             if int(state_label[-1 - q_reg_loc]) == 1:
-                amplitudes_for_one.append(self.quantum_reg.computational_decomp[state_label])
+                amplitudes_for_one.append(basis_states[state_label])
 
         # We then use the sorted amplitudes to generate the probabilities of either
         # measurement outcome
@@ -384,19 +422,19 @@ class QCSim:
         if c_reg_loc != '':
             # Fills in classical_reg with intermediary zeroes if the c_reg_loc
             # hasn't yet been initialized
-            if c_reg_loc > (len(self.classical_reg) - 1):
-                difference = c_reg_loc - (len(self.classical_reg) - 1)
+            if c_reg_loc > (len(self.__classical_reg) - 1):
+                difference = c_reg_loc - (len(self.__classical_reg) - 1)
                 for i in range(difference):
-                    self.classical_reg.append(0)
+                    self.__classical_reg.append(0)
 
-            self.classical_reg[c_reg_loc] = measurement
+            self.__classical_reg[c_reg_loc] = measurement
 
         # Next we project the state of quantum_reg onto the eigenbasis corresponding
         # to the measurement result with the corresponding projection operator,
         # which only has nonzero components on the diagonal when represented in
         # the computational basis
         projector_diag = []
-        for state_label in self.quantum_reg.computational_decomp:
+        for state_label in basis_states:
             if int(state_label[-1 - q_reg_loc]) == measurement:
                 projector_diag.append(1)
 
@@ -404,9 +442,24 @@ class QCSim:
                 projector_diag.append(0)
 
         projector_operator = np.diag(projector_diag)
-        new_state = np.dot(projector_operator, self.quantum_reg.state).tolist()
-        # The change_state() method automatically normalizes new_state
-        self.quantum_reg.change_state(new_state)
+        new_state = np.dot(projector_operator, self.__quantum_reg.state())
+        # Note that the change_state() method automatically normalizes new_state
+        self.__quantum_reg.change_state(new_state.tolist())
+
+    def quantum_reg(self):
+        return self.__quantum_reg.state()
+
+    def classical_reg(self):
+        return copy.deepcopy(self.__classical_reg)
+
+    def __repr__(self):
+        rep = "Quantum Register: "
+        rep += str(self.__quantum_reg.state())
+        rep += "\n"
+        rep = "Classical Register: "
+        rep = str(self.__classical_reg)
+
+        return rep
 
 # Custom errors
 class WrongShapeError(ValueError):
