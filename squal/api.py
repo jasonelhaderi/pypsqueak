@@ -16,12 +16,12 @@ class Program():
         being to append the instruction.
         '''
 
-        # Sets default appeding behavior
+        # Sets default appending behavior
         if position == None:
             position = len(self)
 
         if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
-            raise ValueError('Invalid program position number.')
+            raise ValueError('Invalid program position number. Out of range.')
 
         if not isinstance(gate_target_tuple, tuple):
             raise TypeError('Argument must be a tuple of Gate object followed by target qubits.')
@@ -38,18 +38,47 @@ class Program():
     def rm_instr(self, position=None):
         '''
         Removes an instruction from self.__instructions by index. The default
-        behavior is to removed the last instruction.
+        behavior is to remove the last instruction.
         '''
+
         if position == None:
             position = -1
 
         if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
-            raise ValueError('Invalid program position number.')
+            raise ValueError('Invalid program position number. Out of range.')
 
         del self.__instructions[position]
 
-    def execute(self, n_times):
-        pass
+    def measure(self, qubit_loc, classical_loc=None, position=None):
+        '''
+        Adds to self.__instructions a special instruction to measure the qubit
+        at quantum register location qubit_loc and optionally save it in the
+        classical register at the location classical_loc. The default
+        behavior is to append the measurement to the end of the program, but
+        the instruction can be inserted by setting position to the desired program
+        line (zero-indexed).
+        '''
+
+        # If the classical_loc isn't valid, throw a ValueError
+        if (not isinstance(classical_loc, int) and not isinstance(classical_loc, type(None)))\
+            or classical_loc < 0:
+            raise ValueError('Classical register location must be a nonnegative integer.')
+
+        # Sets default appending behavior
+        if position == None:
+            position = len(self)
+
+        # If the program position is out of range, throw a ValueError
+        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
+            raise ValueError('Invalid program position number. Out of range.')
+
+        # Branch in instruction depending on if a classical_loc is specified for
+        # storing the measurement.
+        if classical_loc == None:
+            self.__instructions.insert(position, ('MEASURE', qubit_loc))
+
+        if isinstance(classical_loc, int) and classical_loc >= 0:
+            self.__instructions.insert(position, ('MEASURE', qubit_loc, classical_loc))
 
     def __len__(self):
         return len(self.__instructions)

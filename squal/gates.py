@@ -35,7 +35,7 @@ def H(target_qubit):
 
     matrix_rep = [[1/np.sqrt(2), ((-1)**i) * 1/np.sqrt(2)] for i in range(2)]
 
-    return (Gate(matrix_rep, target_qubit))
+    return (Gate(matrix_rep), target_qubit)
 
 def SWAP(target_qubit_i, target_qubit_j):
 

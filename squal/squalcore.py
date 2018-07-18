@@ -5,13 +5,13 @@ import cmath
 # 1: Fine tune syntax by writing a front-end API to interact with the simulation.
 #    (a) Change the Gate class so that it has the attribute target_qubit, so that
 #    the functions in gates.py return Gate objects. Adapt QCSim and unit tests
-#    accordingly.
-#    (b) Flesh out Program class in API with means of doing measurement
-#    (key word in add_instr perhaps).
-#    (c) Decide on means for delivering a Program's contents to a QCSim.
-#    (d) Change order of classical register to mirror quantum register.
+#    accordingly. (DONT DO, MAKE API HANDLE)
+#    (b) Flesh out Program class in API with means of doing measurement. (DONE)
+#    (c) Fix unit tests.
+#    (d) Change print order of classical register to mirror quantum register?
 #    (e) There's a bug somewhere in __repr__ for QCSim.
 # 2: Build in standard gates as functions. Write tests for multi-qubit gates.
+#    Add all necessary control operations for classical bits and other functions.
 # 3: Test out 5-Qubit Deutsch-Jozsa Algorithm.
 # 4: Implement noise modeling.
 # 4: Generate QASM and Quil descriptions of code.
@@ -214,7 +214,7 @@ class QCSim:
         self.__q_size = 1
         self.__c_size = 1
 
-    def instr(self, gate, *q_reg):
+    def __instr(self, gate, *q_reg):
         # Check that at least one quantum_reg location is specified for the instruction
         if len(q_reg) == 0:
             raise TypeError('One or more quantum register locations must be specified.')
@@ -260,7 +260,7 @@ class QCSim:
         # Perform swaps of qubits into the operational order (first specified qubit
         # in q_reg_loc 0, second in q_reg_loc 1, etc.)
         for swap_pair in swap_pairs:
-            self.swap(swap_pair[0], swap_pair[1])
+            self.__swap(swap_pair[0], swap_pair[1])
 
         # If the gate and size of the quantum register match, just operate with the gate
         if self.__q_size == len(gate):
@@ -278,15 +278,12 @@ class QCSim:
 
         new_reg_state = np.dot(operator.state(), self.__quantum_reg.state())
         self.__quantum_reg.change_state(new_reg_state.tolist())
-        # self.quantum_reg.state() = np.dot(operator.state, self.quantum_reg.state)
-        # self.quantum_reg.normalize()
-        # self.quantum_reg.decompose_into_comp_basis()
 
         # Swap qubits back into original order
         for swap_pair in swap_pairs:
-            self.swap(swap_pair[0], swap_pair[1])
+            self.__swap(swap_pair[0], swap_pair[1])
 
-    def swap(self, i, j):
+    def __swap(self, i, j):
         # Swaps higher of i and j by taking the upper index down abs(i - j) times,
         # and then taking the lower index up abs(i - j) - 1 times
         if not isinstance(i, int) or not isinstance(j, int):
@@ -366,7 +363,7 @@ class QCSim:
             # self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
             # self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
 
-    def measure(self, q_reg_loc, c_reg_loc=''):
+    def __measure(self, q_reg_loc, c_reg_loc=''):
         # Performs a measurement on the qubit at q_reg_loc in the quantum_reg,
         # and optionally stores the result at a specified location in the
         # classical_reg
@@ -447,10 +444,54 @@ class QCSim:
         self.__quantum_reg.change_state(new_state.tolist())
 
     def quantum_reg(self):
+        '''
+        Returns a copy of the quantum register's state.
+        '''
         return self.__quantum_reg.state()
 
     def classical_reg(self):
+        '''
+        Returns a copy of the classical register's state.
+        '''
         return copy.deepcopy(self.__classical_reg)
+
+    def __reset(self):
+        '''
+        Resets the quantum and classical registers.
+        '''
+        self.__quantum_reg = Qubit()
+        self.__classical_reg = [0]
+        self.__q_size = 1
+        self.__c_size = 1
+
+    def execute(self, program):
+        if not isinstance(program, type(Program())):
+            raise TypeError('Can only execute Program objects.')
+
+        # Run through each line of the program
+        for program_line in program:
+            # If the line is a normal instruction (Gate, *targets), hand the
+            # gate and targets over to self.instr()
+            if isinstance(program_line[0], type(Gate())):
+                self.__instr(program_line[0], *program_line[1:])
+
+            # Otherwise, if the line is a measurement instruction
+            # ('MEASURE', q_reg_loc, optional c_reg_loc), hand the
+            # contents over to self.measure()
+            elif program_line[0] == 'MEASURE':
+                q_loc = program_line[1]
+                c_loc = ''
+                if len(program_line) == 3:
+                    c_loc = program_line[2]
+
+                self.__measure(q_loc, c_loc)
+
+        output_q_reg = self.quantum_reg()
+        output_c_reg = self.classical_reg()
+
+        self.__reset()
+
+        return (output_q_reg, output_c_reg)
 
     def __repr__(self):
         rep = "Quantum Register: "
@@ -460,6 +501,112 @@ class QCSim:
         rep = str(self.__classical_reg)
 
         return rep
+
+class Program():
+    '''
+    Program class provides a data structure for composing and organizing programs
+    to run on QCSim.
+    '''
+
+    def __init__(self):
+        self.__instructions = []
+
+    def __iter__(self):
+        self.__line = -1
+        return self
+
+    def __next__(self):
+        self.__line += 1
+
+        if self.__line > len(self) - 1:
+            raise StopIteration
+        return self.__instructions[self.__line]
+
+    def add_instr(self, gate_target_tuple, position=None):
+        '''
+        Adds an instruction to self.__instructions, with the default behavior
+        being to append the instruction.
+        '''
+
+        # Sets default appending behavior
+        if position == None:
+            position = len(self)
+
+        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
+            raise ValueError('Invalid program position number. Out of range.')
+
+        if not isinstance(gate_target_tuple, tuple):
+            raise TypeError('Argument must be a tuple of Gate object followed by target qubits.')
+
+        elif not isinstance(gate_target_tuple[0], type(Gate())):
+            raise TypeError('First element of argument must be a Gate object.')
+
+        for i in range(1, len(gate_target_tuple)):
+            if not isinstance(gate_target_tuple[i], int) or gate_target_tuple[i] < 0:
+                raise ValueError('Target qubits must be nonnegative integers.')
+
+        self.__instructions.insert(position, gate_target_tuple)
+
+    def rm_instr(self, position=None):
+        '''
+        Removes an instruction from self.__instructions by index. The default
+        behavior is to remove the last instruction.
+        '''
+
+        if position == None:
+            position = len(self) - 1
+
+        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
+            raise ValueError('Invalid program position number. Must be a nonnegative integer.')
+
+        del self.__instructions[position]
+
+    def measure(self, qubit_loc, classical_loc=None, position=None):
+        '''
+        Adds to self.__instructions a special instruction to measure the qubit
+        at quantum register location qubit_loc and optionally save it in the
+        classical register at the location classical_loc. The default
+        behavior is to append the measurement to the end of the program, but
+        the instruction can be inserted by setting position to the desired program
+        line (zero-indexed).
+        '''
+
+        # If the classical_loc isn't valid, throw a ValueError
+        if (not isinstance(classical_loc, int) and not isinstance(classical_loc, type(None))):
+            raise ValueError('Classical register location must be a nonnegative integer.')
+
+        if not isinstance(classical_loc, type(None)):
+            if classical_loc < 0:
+                raise ValueError('Classical register location must be a nonnegative integer.')
+
+        # Sets default appending behavior
+        if position == None:
+            position = len(self)
+
+        # If the program position is out of range, throw a ValueError
+        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
+            raise ValueError('Invalid program position number. Out of range.')
+
+        # Branch in instruction depending on if a classical_loc is specified for
+        # storing the measurement.
+        if classical_loc == None:
+            self.__instructions.insert(position, ('MEASURE', qubit_loc))
+
+        if isinstance(classical_loc, int) and classical_loc >= 0:
+            self.__instructions.insert(position, ('MEASURE', qubit_loc, classical_loc))
+
+    def __len__(self):
+        return len(self.__instructions)
+
+    def __repr__(self):
+        program_rep = ""
+        for instruction in self.__instructions:
+            program_rep += str(instruction)
+            program_rep += '\n'
+
+        program_rep = program_rep.rstrip('\n')
+        return str(program_rep)
+
 
 # Custom errors
 class WrongShapeError(ValueError):

@@ -1,7 +1,10 @@
-from context import sq # squalcore module
+# from context import sq # squalcore module
+import context
+import squal.squalcore as sq
 import unittest
 import numpy as np
 import cmath
+import squal.gates as gate
 
 # Qubit Tests
 
@@ -238,89 +241,133 @@ class QCSimSuccess(unittest.TestCase):
 
     def setUp(self):
         # Test gates
-        self.gate_i = sq.Gate()
-        self.gate_x = sq.Gate([[0, 1],
-                               [1, 0]])
-        self.gate_H = sq.Gate([[1/np.sqrt(2), 1/np.sqrt(2)],
-                               [1/np.sqrt(2), -1/np.sqrt(2)]])
+        # self.gate_i = sq.Gate()
+        # self.gate_x = sq.Gate([[0, 1],
+        #                        [1, 0]])
+        # self.gate_H = sq.Gate([[1/np.sqrt(2), 1/np.sqrt(2)],
+        #                        [1/np.sqrt(2), -1/np.sqrt(2)]])
 
         # Test machines
         self.test_qc = sq.QCSim()
 
-        self.test_qc_1 = sq.QCSim()
-        self.test_qc_1.instr(self.gate_x, 0)
+        # self.test_qc_1 = sq.QCSim()
+        # self.test_qc_1.instr(self.gate_x, 0)
+        #
+        # self.test_qc_001 = sq.QCSim()
+        # self.test_qc_001.instr(self.gate_i, 2)
+        # self.test_qc_001.instr(self.gate_x, 0)
+        #
+        # self.test_qc_100 = sq.QCSim()
+        # self.test_qc_100.instr(self.gate_x, 2)
 
-        self.test_qc_001 = sq.QCSim()
-        self.test_qc_001.instr(self.gate_i, 2)
-        self.test_qc_001.instr(self.gate_x, 0)
-
-        self.test_qc_100 = sq.QCSim()
-        self.test_qc_100.instr(self.gate_x, 2)
+        # Test programs
+        self.test_program = sq.Program()
 
     def test_known_measurement_results(self):
         '''Verifies that the proper post-measurement state occurs in several cases'''
 
-        self.test_qc_1.measure(0)
-        post_measurement_1 = self.test_qc_1.quantum_reg()
-        self.test_qc_100.measure(0)
-        post_measurement_2 = self.test_qc_100.quantum_reg()
-        self.test_qc_100.measure(2)
-        post_measurement_3 = self.test_qc_100.quantum_reg()
+        # QCSim is initialized in the |0> state, so first let's measure a freshly
+        # initialized QCSim, and store what should be zero in the 1st classical register
+        # location
+        p = sq.Program()
+        p.measure(0, 1)
+        q_reg_output, c_reg_output = self.test_qc.execute(p)
+        np.testing.assert_array_equal(q_reg_output, np.array([1, 0]))
+        np.testing.assert_array_equal(c_reg_output, [0, 0])
 
-        test_results = [post_measurement_1, post_measurement_2, post_measurement_3]
-        correct_results = [np.array([0, 1]),
-                   np.array([0, 0, 0, 0, 1, 0, 0, 0]),
-                   np.array([0, 0, 0, 0, 1, 0, 0, 0])]
+        # Now let's remove that instruction from the program and see that the X
+        # gate gives a |1> state by saving the measurement into the 6th classical
+        # register location
+        p.rm_instr()
+        p.add_instr(gate.X(0))
+        p.measure(0, 6)
+        q_reg_output, c_reg_output = self.test_qc.execute(p)
+        np.testing.assert_array_equal(q_reg_output, np.array([0, 1]))
+        np.testing.assert_array_equal(c_reg_output, [0, 0, 0, 0, 0, 0, 1])
 
-        for test_pair in zip(test_results, correct_results):
-            np.testing.assert_array_equal(test_pair[0], test_pair[1])
+        # Now let's reset the program to initialize the state |100>, and then measure
+        # the 1st and 2nd qubits into classical register locations 3 and 2, respectively,
+        # and then measure the 0th qubit without storing the result
+        while len(p) > 0:
+            p.rm_instr()
+
+        p.add_instr(gate.X(2))
+        p.measure(1, 3)
+        p.measure(2, 2)
+        p.measure(0)
+        q_reg_output, c_reg_output = self.test_qc.execute(p)
+        np.testing.assert_array_equal(q_reg_output,\
+                                      np.array([0, 0, 0, 0, 1, 0, 0, 0]))
+        np.testing.assert_array_equal(c_reg_output, [0, 0, 1, 0])
 
     def test_known_instr_results(self):
-        '''Verifies the output of several known instructions'''
+        '''
+        Verifies the output of several known instructions.
+        '''
 
-        test_groups = [(self.gate_x, 0, self.test_qc),
-                      (self.gate_i, 3, self.test_qc_1),
-                      (self.gate_H, 2, self.test_qc_100)]
+        test_programs = [sq.Program() for i in range(3)]
+
+        # Takes |0> to |1>
+        test_programs[0].add_instr(gate.X(0))
+
+        # Takes |0> to |0001>
+        test_programs[1].add_instr(gate.X(0))
+        test_programs[1].add_instr(gate.I(3))
+
+        # Takes |0> to (1/sqrt(2))(|000> - |100>)
+        test_programs[2].add_instr(gate.I(2))
+        test_programs[2].add_instr(gate.X(2))
+        test_programs[2].add_instr(gate.H(2))
+
         results = [np.array([0, 1]),
                    np.array([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
                    1/np.sqrt(2) * np.array([1, 0, 0, 0, -1, 0, 0, 0])]
 
-        for i in range(len(test_groups)):
-            # Reset machines
-            self.test_qc = sq.QCSim()
-
-            self.test_qc_1 = sq.QCSim()
-            self.test_qc_1.instr(self.gate_x, 0)
-            self.test_qc_1.instr(self.gate_i, 3)
-
-            self.test_qc_100 = sq.QCSim()
-            self.test_qc_100.instr(self.gate_x, 2)
-
-            # Run instructions
-            test_groups[i][2].instr(test_groups[i][0], test_groups[i][1])
-            np.testing.assert_array_almost_equal(test_groups[i][2].quantum_reg(), results[i])
+        for test_pair in zip(test_programs, results):
+            q_reg_output = self.test_qc.execute(test_pair[0])[0]
+            np.testing.assert_array_almost_equal(q_reg_output, test_pair[1])
 
     def test_add_distant_qubit(self):
-        '''instr for a non-extant qubit should initialize new filler qubits too'''
+        '''
+        instr for a non-extant qubit should initialize new filler qubits.
+        '''
 
         self.test_qc.instr(self.gate_i, 2)
         state_000 = np.array([1, 0, 0, 0, 0, 0, 0, 0])
         np.testing.assert_array_equal(self.test_qc.quantum_reg(), state_000)
 
     def test_known_swaps(self):
-        '''Verifies known swaps'''
+        '''
+        Verifies known swaps in the private self.__swap() method.
+        '''
+        # We use a hard-coded identity gate to initialize extra qubits
+        i_gate = gate.X(0)[0]
 
-        self.test_qc_001.swap(0, 2)
+        # Verify that |001> gets swapped to |100>
+        self.test_qc._QCSim__instr(i_gate, 2)
+        self.test_qc._QCSim__quantum_reg.change_state([0, 1, 0, 0, 0, 0, 0, 0])
+        self.test_qc._QCSim__swap(0, 2)
         state_100 = np.array([0, 0, 0, 0, 1, 0, 0, 0])
+        np.testing.assert_array_almost_equal(self.test_qc.quantum_reg(), state_100)
 
-        self.test_qc_100.swap(1, 2)
+        self.test_qc._QCSim__reset()
+
+        # Verify that |100> gets swapped to |010> when qubits 1 and 2 are swapped
+        self.test_qc._QCSim__instr(i_gate, 2)
+        self.test_qc._QCSim__quantum_reg.change_state([0, 0, 0, 0, 1, 0, 0, 0])
+        self.test_qc._QCSim__swap(1, 2)
         state_010 = np.array([0, 0, 1, 0, 0, 0, 0, 0])
+        np.testing.assert_array_almost_equal(self.test_qc.quantum_reg(), state_010)
 
-        test_pairs = [(self.test_qc_001.quantum_reg(), state_100),
-                      (self.test_qc_100.quantum_reg(), state_010)]
+        self.test_qc._QCSim__reset()
 
-        for pair in test_pairs:
-            np.testing.assert_array_equal(pair[0], pair[1])
+        # Verify that (|011> - |010>)/sqrt(2) gets swapped to (|101> - |100>)/sqrt(2)
+        # when qubits 1 and 2 are swapped
+        self.test_qc._QCSim__instr(i_gate, 2)
+        self.test_qc._QCSim__quantum_reg.change_state([0, 0, -1, 1, 0, 0, 0, 0])
+        self.test_qc._QCSim__swap(1, 2)
+        state_superposition = (1/np.sqrt(2)) * np.array([0, 0, 0, 0, -1, 1, 0, 0])
+        np.testing.assert_array_almost_equal(self.test_qc.quantum_reg(), state_superposition)
 
 class QCSimFailure(unittest.TestCase):
 
