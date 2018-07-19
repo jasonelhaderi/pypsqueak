@@ -13,31 +13,31 @@ def X(target_qubit):
     matrix_rep = [[0, 1],
                   [1, 0]]
 
-    return (Gate(matrix_rep), target_qubit)
+    return (Gate(matrix_rep, name='X'), target_qubit)
 
 def Y(target_qubit):
 
     matrix_rep = [[0, -1j],
                   [1j, 0]]
 
-    return (Gate(matrix_rep), target_qubit)
+    return (Gate(matrix_rep, name='Y'), target_qubit)
 
 def Z(target_qubit):
 
     matrix_rep = [[1, 0],
                   [0, -1]]
 
-    return (Gate(matrix_rep), target_qubit)
+    return (Gate(matrix_rep, name='Z'), target_qubit)
 
 def I(target_qubit):
 
-    return (Gate(), target_qubit)
+    return (Gate(name='I'), target_qubit)
 
 def H(target_qubit):
 
     matrix_rep = [[1/np.sqrt(2), ((-1)**i) * 1/np.sqrt(2)] for i in range(2)]
 
-    return (Gate(matrix_rep), target_qubit)
+    return (Gate(matrix_rep, name='H'), target_qubit)
 
 def SWAP(target_qubit_i, target_qubit_j):
 
@@ -46,7 +46,7 @@ def SWAP(target_qubit_i, target_qubit_j):
                   [0, 1, 0, 0],
                   [0, 0, 0, 1]]
 
-    return (Gate(matrix_rep), target_qubit_i, target_qubit_j)
+    return (Gate(matrix_rep, name='SWAP'), target_qubit_i, target_qubit_j)
 
 STD_GATES = {'X': X,
              'Y': Y,

@@ -258,9 +258,10 @@ class QCSimSuccess(unittest.TestCase):
         # location
         p = sq.Program()
         p.measure(0, 1)
-        q_reg_output, c_reg_output = self.test_qc.execute(p)
-        np.testing.assert_array_equal(q_reg_output, np.array([1, 0]))
-        np.testing.assert_array_equal(c_reg_output, [0, 0])
+        output_q_reg =self.test_qc.quantum_state(p)
+        output_c_reg = self.test_qc.execute(p)
+        np.testing.assert_array_equal(output_q_reg.state(), np.array([1, 0]))
+        np.testing.assert_array_equal(output_c_reg, [0, 0])
 
         # Now let's remove that instruction from the program and see that the X
         # gate gives a |1> state by saving the measurement into the 6th classical
@@ -268,9 +269,10 @@ class QCSimSuccess(unittest.TestCase):
         p.rm_instr()
         p.add_instr(gt.X(0))
         p.measure(0, 6)
-        q_reg_output, c_reg_output = self.test_qc.execute(p)
-        np.testing.assert_array_equal(q_reg_output, np.array([0, 1]))
-        np.testing.assert_array_equal(c_reg_output, [0, 0, 0, 0, 0, 0, 1])
+        output_q_reg =self.test_qc.quantum_state(p)
+        output_c_reg = self.test_qc.execute(p)
+        np.testing.assert_array_equal(output_q_reg.state(), np.array([0, 1]))
+        np.testing.assert_array_equal(output_c_reg, [0, 0, 0, 0, 0, 0, 1])
 
         # Now let's reset the program to initialize the state |100>, and then measure
         # the 1st and 2nd qubits into classical register locations 3 and 2, respectively,
@@ -282,10 +284,11 @@ class QCSimSuccess(unittest.TestCase):
         p.measure(1, 3)
         p.measure(2, 2)
         p.measure(0)
-        q_reg_output, c_reg_output = self.test_qc.execute(p)
-        np.testing.assert_array_equal(q_reg_output,\
+        output_q_reg =self.test_qc.quantum_state(p)
+        output_c_reg = self.test_qc.execute(p)
+        np.testing.assert_array_equal(output_q_reg.state(),\
                                       np.array([0, 0, 0, 0, 1, 0, 0, 0]))
-        np.testing.assert_array_equal(c_reg_output, [0, 0, 1, 0])
+        np.testing.assert_array_equal(output_c_reg, [0, 0, 1, 0])
 
     def test_known_instr_results(self):
         '''
@@ -311,19 +314,19 @@ class QCSimSuccess(unittest.TestCase):
                    1/np.sqrt(2) * np.array([1, 0, 0, 0, -1, 0, 0, 0])]
 
         for test_pair in zip(test_programs, results):
-            q_reg_output = self.test_qc.execute(test_pair[0])[0]
-            np.testing.assert_array_almost_equal(q_reg_output, test_pair[1])
+            q_reg_output = self.test_qc.quantum_state(test_pair[0])
+            np.testing.assert_array_almost_equal(q_reg_output.state(), test_pair[1])
 
     def test_add_distant_qubit(self):
         '''
-        The private self.__instr() method called with for a non-extant target qubit
+        A program applying a gate to a non-extant target qubit
         should initialize filler qubits in the |0> state.
         '''
 
-        i_gate = gt.I(0)[0]
-        self.test_qc._QCSim__instr(i_gate, 2)
+        self.test_program.add_instr(gt.I(2))
+        output_q_reg = self.test_qc.quantum_state(self.test_program)
         state_000 = np.array([1, 0, 0, 0, 0, 0, 0, 0])
-        np.testing.assert_array_equal(self.test_qc.quantum_reg(), state_000)
+        np.testing.assert_array_equal(output_q_reg.state(), state_000)
 
     def test_known_swaps(self):
         '''
@@ -337,7 +340,7 @@ class QCSimSuccess(unittest.TestCase):
         self.test_qc._QCSim__quantum_reg.change_state([0, 1, 0, 0, 0, 0, 0, 0])
         self.test_qc._QCSim__swap(0, 2)
         state_100 = np.array([0, 0, 0, 0, 1, 0, 0, 0])
-        np.testing.assert_array_almost_equal(self.test_qc.quantum_reg(), state_100)
+        np.testing.assert_array_almost_equal(self.test_qc._QCSim__quantum_reg.state(), state_100)
 
         self.test_qc._QCSim__reset()
 
@@ -346,7 +349,7 @@ class QCSimSuccess(unittest.TestCase):
         self.test_qc._QCSim__quantum_reg.change_state([0, 0, 0, 0, 1, 0, 0, 0])
         self.test_qc._QCSim__swap(1, 2)
         state_010 = np.array([0, 0, 1, 0, 0, 0, 0, 0])
-        np.testing.assert_array_almost_equal(self.test_qc.quantum_reg(), state_010)
+        np.testing.assert_array_almost_equal(self.test_qc._QCSim__quantum_reg.state(), state_010)
 
         self.test_qc._QCSim__reset()
 
@@ -356,7 +359,7 @@ class QCSimSuccess(unittest.TestCase):
         self.test_qc._QCSim__quantum_reg.change_state([0, 0, -1, 1, 0, 0, 0, 0])
         self.test_qc._QCSim__swap(1, 2)
         state_superposition = (1/np.sqrt(2)) * np.array([0, 0, 0, 0, -1, 1, 0, 0])
-        np.testing.assert_array_almost_equal(self.test_qc.quantum_reg(), state_superposition)
+        np.testing.assert_array_almost_equal(self.test_qc._QCSim__quantum_reg.state(), state_superposition)
 
 class QCSimFailure(unittest.TestCase):
 

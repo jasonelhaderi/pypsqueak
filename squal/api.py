@@ -261,17 +261,17 @@ class QCSim:
         # Note that the change_state() method automatically normalizes new_state
         self.__quantum_reg.change_state(new_state.tolist())
 
-    def quantum_reg(self):
-        '''
-        Returns a copy of the quantum register's state.
-        '''
-        return self.__quantum_reg.state()
-
-    def classical_reg(self):
-        '''
-        Returns a copy of the classical register's state.
-        '''
-        return copy.deepcopy(self.__classical_reg)
+    # def quantum_reg(self):
+    #     '''
+    #     Returns a copy of the quantum register's state.
+    #     '''
+    #     return Qubit(self.__quantum_reg.state().tolist())
+    #
+    # def classical_reg(self):
+    #     '''
+    #     Returns a copy of the classical register's state.
+    #     '''
+    #     return copy.deepcopy(self.__classical_reg)
 
     def __reset(self):
         '''
@@ -283,6 +283,9 @@ class QCSim:
         self.__c_size = 1
 
     def execute(self, program):
+        '''
+        Returns the contents of the classical register after executing a program.
+        '''
         if not isinstance(program, type(Program())):
             raise TypeError('Can only execute Program objects.')
 
@@ -304,21 +307,46 @@ class QCSim:
 
                 self.__measure(q_loc, c_loc)
 
-        output_q_reg = self.quantum_reg()
-        output_c_reg = self.classical_reg()
+        # output_q_reg = self.quantum_reg()
+        # output_c_reg = self.classical_reg()
+        # output_q_reg = Qubit(self.__quantum_reg.state().tolist())
+        output_c_reg = copy.deepcopy(self.__classical_reg)
 
         self.__reset()
 
-        return (output_q_reg, output_c_reg)
+        return output_c_reg
 
-    def __repr__(self):
-        rep = "Quantum Register: "
-        rep += str(self.__quantum_reg.state())
-        rep += "\n"
-        rep = "Classical Register: "
-        rep = str(self.__classical_reg)
+    def quantum_state(self, program):
+        '''
+        Returns the state of the quantum register after executing a program.
+        From a physical perspective, this is cheating!
+        '''
+        if not isinstance(program, type(Program())):
+            raise TypeError('Can only execute Program objects.')
 
-        return rep
+        # Run through each line of the program
+        for program_line in program:
+            # If the line is a normal instruction (Gate, *targets), hand the
+            # gate and targets over to self.instr()
+            if isinstance(program_line[0], type(Gate())):
+                self.__instr(program_line[0], *program_line[1:])
+
+            # Otherwise, if the line is a measurement instruction
+            # ('MEASURE', q_reg_loc, optional c_reg_loc), hand the
+            # contents over to self.measure()
+            elif program_line[0] == 'MEASURE':
+                q_loc = program_line[1]
+                c_loc = ''
+                if len(program_line) == 3:
+                    c_loc = program_line[2]
+
+                self.__measure(q_loc, c_loc)
+
+        output_q_reg = Qubit(self.__quantum_reg.state().tolist())
+
+        self.__reset()
+
+        return output_q_reg
 
 class Program():
     '''
@@ -417,10 +445,10 @@ class Program():
         return len(self.__instructions)
 
     def __repr__(self):
-        program_rep = ""
+        program_rep = "{\n"
         for instruction in self.__instructions:
             program_rep += str(instruction)
             program_rep += '\n'
 
-        program_rep = program_rep.rstrip('\n')
+        program_rep += '}'
         return str(program_rep)

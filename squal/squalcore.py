@@ -10,7 +10,6 @@ import squal.errors as sqerr
 #    (b) Flesh out Program class in API with means of doing measurement. (DONE)
 #    (c) Fix unit tests. (DONE)
 #    (d) Fix imports in files. (DONE)
-#    (e) There's a bug somewhere in __repr__ for QCSim.
 # 2: Build in standard gates as functions. Write tests for multi-qubit gates.
 #    Add all necessary control operations for classical bits and other functions.
 # 3: Test out 5-Qubit Deutsch-Jozsa Algorithm.
@@ -147,7 +146,7 @@ class Gate:
     Creates a unitary gate out of some_matrix.
     '''
 
-    def __init__(self, some_matrix = [(1, 0), (0, 1)]):
+    def __init__(self, some_matrix = [(1, 0), (0, 1)], name = None):
         # Checks that input is list-like
         if not isinstance(some_matrix, list) and not isinstance(some_matrix, tuple):
             raise ValueError('Input must be list or tuple.')
@@ -166,8 +165,17 @@ class Gate:
             if len(row) != self.__shape[0]:
                 raise sqerr.WrongShapeError('Gate must be a square matrix.')
 
+        # Checks that the name (if any) is a string
+        if not isinstance(name, str) and not isinstance(name, type(None)):
+            raise TypeError('Name of Gate (if any) must be str.')
+
         # Initialize the gate
         self.__state = np.array(some_matrix)
+        if name == None:
+            self.__name = str(self.__state)
+
+        if name != None:
+            self.__name = name
 
         # Checks that the input is unitary
         product_with_conj = np.dot(self.__state.conj().T, self.__state)
@@ -209,4 +217,8 @@ class Gate:
         return int(np.log2(self.__shape[0]))
 
     def __repr__(self):
-        return str(self.__state)
+        if self.__name != None:
+            return self.__name
+
+        else:
+            return str(self.__state)
