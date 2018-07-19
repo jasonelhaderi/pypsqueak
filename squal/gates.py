@@ -3,8 +3,10 @@ import cmath
 
 from squal.squalcore import Gate
 
-'''Functions implementing the various standard gates on one or more target_qubits.
-Each returns a tuple of Gate object, target_qubits'''
+'''
+Functions implementing various standard gates on one or more target_qubits.
+Each returns a tuple of Gate object, target_qubits.
+'''
 
 def X(target_qubit):
 
