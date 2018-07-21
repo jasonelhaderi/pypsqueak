@@ -10,8 +10,10 @@ import squal.errors as sqerr
 #    (b) Flesh out Program class in API with means of doing measurement. (DONE)
 #    (c) Fix unit tests. (DONE)
 #    (d) Fix imports in files. (DONE)
-# 2: Build in standard gates as functions. Write tests for multi-qubit gates.
-#    Add all necessary control operations for classical bits and other functions.
+# 2: Build in standard gates as functions. Stich front and back end of classical
+#    gates together(DONE). Write tests for multi-qubit gates. (changed anys to maxs, keep an eye on them)
+#    Add all necessary control operations (IF gets its own sublines) for classical bits and other functions.
+#    Write more unit tests for classical logic gates.
 # 3: Test out 5-Qubit Deutsch-Jozsa Algorithm.
 # 4: Implement noise modeling.
 # 4: Generate QASM and Quil descriptions of code.

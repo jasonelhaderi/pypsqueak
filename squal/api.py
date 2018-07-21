@@ -48,7 +48,7 @@ class QCSim:
 
         # If any of the specified quantum_reg locations have not yet been initialized,
         # initialize them (as well as intermediate reg locs) in the |0> state
-        if any(q_reg) > self.__q_size - 1:
+        if max(q_reg) > self.__q_size - 1:
             n_new_registers = max(q_reg) - (self.__q_size - 1)
             new_register = Qubit()
             for i in range(n_new_registers - 1):
@@ -96,6 +96,52 @@ class QCSim:
         # Swap qubits back into original order
         for swap_pair in swap_pairs:
             self.__swap(swap_pair[0], swap_pair[1])
+
+    def __cinstr(self, name, *target_bits):
+        # Checks that name is a string and that a valid target is specified
+        if len(target_bits) == 0:
+            raise ValueError('No target specified for classical instruction.')
+
+        if not isinstance(name, str):
+            raise ValueError('The name of the classical instruction must be a string.')
+
+        if name not in gt.CLASSICAL_OPS:
+            raise ValueError('Unknown operation.')
+
+        # If any of the target_bits are outside the range of the classical register,
+        # initialize intermediary bits with the value zero
+        if max(target_bits) > len(self.__classical_reg) - 1:
+            diff = max(target_bits) - (len(self.__classical_reg) - 1)
+            for i in range(diff):
+                self.__classical_reg.append(0)
+
+            self.__c_size = len(self.__classical_reg)
+
+        # We handle COPY and EXCHANGE operations separately
+        if name != 'COPY' and name != 'EXCHANGE':
+            # The last argument in target_bits is the c_reg_index where the result of
+            # calling either of a unary or binary operation on input_values gets stored
+            input_values = [self.__classical_reg[target] for target in target_bits]
+            if len(input_values) > 1:
+                input_values.pop()
+
+            c_reg_index = target_bits[-1]
+            new_bit_value = gt.CLASSICAL_OPS[name](*input_values)
+            self.__classical_reg[c_reg_index] = new_bit_value
+
+        if name == 'COPY' or name == 'EXCHANGE':
+            if len(target_bits) != 2:
+                raise ValueError('COPY and EXCHANGE operations require 2 targets')
+
+            else:
+                c_reg_index_1 = target_bits[0]
+                c_reg_index_2 = target_bits[1]
+                input_values = [self.__classical_reg[target] for target in target_bits]
+
+                new_bit_values = gt.CLASSICAL_OPS[name](*input_values)
+
+                self.__classical_reg[c_reg_index_1] = new_bit_values[0]
+                self.__classical_reg[c_reg_index_2] = new_bit_values[1]
 
     def __swap(self, i, j):
         # Swaps higher of i and j by taking the upper index down abs(i - j) times,
@@ -196,6 +242,9 @@ class QCSim:
         if q_reg_loc < 0:
             raise ValueError('Quantum register location must be nonnegative.')
 
+        if q_reg_loc > self.__q_size - 1:
+            raise ValueError('Specified quantum register location does not exist.')
+
         if c_reg_loc != '':
             if c_reg_loc < 0:
                 raise ValueError('Classical register location must be nonnegative.')
@@ -261,18 +310,6 @@ class QCSim:
         # Note that the change_state() method automatically normalizes new_state
         self.__quantum_reg.change_state(new_state.tolist())
 
-    # def quantum_reg(self):
-    #     '''
-    #     Returns a copy of the quantum register's state.
-    #     '''
-    #     return Qubit(self.__quantum_reg.state().tolist())
-    #
-    # def classical_reg(self):
-    #     '''
-    #     Returns a copy of the classical register's state.
-    #     '''
-    #     return copy.deepcopy(self.__classical_reg)
-
     def __reset(self):
         '''
         Resets the quantum and classical registers.
@@ -306,6 +343,9 @@ class QCSim:
                     c_loc = program_line[2]
 
                 self.__measure(q_loc, c_loc)
+
+            elif program_line[0] in gt.CLASSICAL_OPS:
+                self.__cinstr(program_line[0], *program_line[1:])
 
         # output_q_reg = self.quantum_reg()
         # output_c_reg = self.classical_reg()
@@ -370,7 +410,7 @@ class Program():
 
     def add_instr(self, gate_target_tuple, position=None):
         '''
-        Adds an instruction to self.__instructions, with the default behavior
+        Adds a quantum instruction to self.__instructions, with the default behavior
         being to append the instruction.
         '''
 
@@ -393,9 +433,30 @@ class Program():
 
         self.__instructions.insert(position, gate_target_tuple)
 
+    def add_cinstr(self, classical_gate, position=None):
+        '''
+        Adds a classical unary or binary instruction to self.__instructions, with
+        the default behavior being to append the instruction.
+        '''
+
+        # Sets default appending behavior
+        if position == None:
+            position = len(self)
+
+        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
+            raise ValueError('Invalid program position number. Out of range.')
+
+        if not isinstance(classical_gate, tuple):
+            raise TypeError('Argument must be a tuple of gate name string followed by target bits.')
+
+        elif not isinstance(classical_gate[0], str):
+            raise TypeError('First element of argument must be a string (name of gate).')
+
+        self.__instructions.insert(position, classical_gate)
+
     def rm_instr(self, position=None):
         '''
-        Removes an instruction from self.__instructions by index. The default
+        Removes a generic instruction from self.__instructions by index. The default
         behavior is to remove the last instruction.
         '''
 

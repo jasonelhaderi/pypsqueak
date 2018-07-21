@@ -448,7 +448,89 @@ class QCSimFailure(unittest.TestCase):
 
         self.assertRaises(ValueError, self.test_qc._QCSim__swap, 0, 3)
 
+class ClassicalControlValidInput(unittest.TestCase):
 
+    def setUp(self):
+        # Test machine
+        self.test_qc = sq.QCSim()
+
+        # Test program
+        self.test_program = sq.Program()
+
+    def test_classical_logic_gates(self):
+        '''
+        Verifys the action of classical logic gates.
+        '''
+
+        # Prepare the classical register state 0, 1, 0
+        self.test_program.measure(0, 2)
+        self.test_program.add_instr(gt.X(0))
+        self.test_program.measure(0, 1)
+
+        # Negate each bit to yield 1, 0, 1
+        for i in range(3):
+            self.test_program.add_cinstr(gt.NOT(i))
+
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [1, 0, 1])
+
+        # Erase program
+        while len(self.test_program) > 0:
+            self.test_program.rm_instr()
+
+        # Prepare the classical register state 0, 0, 0, 0, 0, 1
+        self.test_program.add_instr(gt.X(0))
+        self.test_program.measure(0, 5)
+
+        # Use the first for register locations as a truth table for AND
+        self.test_program.add_cinstr(gt.AND(4, 4, 0))
+        self.test_program.add_cinstr(gt.AND(4, 5, 1))
+        self.test_program.add_cinstr(gt.AND(5, 4, 2))
+        self.test_program.add_cinstr(gt.AND(5, 5, 3))
+
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program),\
+                                      [0, 0, 0, 1, 0, 1])
+
+        # Erase program
+        while len(self.test_program) > 0:
+            self.test_program.rm_instr()
+
+        # Prepare the classical register state 0, 0, 0, 0, 0, 1
+        self.test_program.add_instr(gt.X(0))
+        self.test_program.measure(0, 5)
+
+        # Use the first for register locations as a truth table for OR
+        self.test_program.add_cinstr(gt.OR(4, 4, 0))
+        self.test_program.add_cinstr(gt.OR(4, 5, 1))
+        self.test_program.add_cinstr(gt.OR(5, 4, 2))
+        self.test_program.add_cinstr(gt.OR(5, 5, 3))
+
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program),\
+                                      [0, 1, 1, 1, 0, 1])
+
+        # Erase program
+        while len(self.test_program) > 0:
+            self.test_program.rm_instr()
+
+        # Test TRUE and FALSE
+        self.test_program.add_cinstr(gt.TRUE(1))
+        self.test_program.add_cinstr(gt.TRUE(0))
+        self.test_program.add_cinstr(gt.FALSE(1))
+
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [1, 0])
+
+        # Erase program
+        while len(self.test_program) > 0:
+            self.test_program.rm_instr()
+
+        # Check COPY and EXCHANGE
+        self.test_program.add_cinstr(gt.TRUE(0))
+        for i in range(3):
+            self.test_program.add_cinstr(gt.COPY(0, 2*i))
+
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [1, 0, 1, 0, 1])
+
+        self.test_program.add_cinstr(gt.EXCHANGE(4, 3))
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [1, 0, 1, 1, 0])
 
 if __name__ == '__main__':
     unittest.main()
