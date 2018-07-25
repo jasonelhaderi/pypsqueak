@@ -67,6 +67,15 @@ def SWAP(target_qubit_i, target_qubit_j):
 
     return (Gate(matrix_rep, name='SWAP'), target_qubit_i, target_qubit_j)
 
+def CNOT(control_qubit, target_qubit):
+
+    matrix_rep = [[1, 0, 0, 0],
+                  [0, 1, 0, 0],
+                  [0, 0, 0, 1],
+                  [0, 0, 1, 0]]
+
+    return (Gate(matrix_rep, name='CNOT'), control_qubit, target_qubit)
+
 # Classical gates (prepended with '_' are for the backend in QCSim)
 
 def NOT(c_reg_loc):

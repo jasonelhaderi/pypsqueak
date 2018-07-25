@@ -1,22 +1,15 @@
 import numpy as np
 import copy
 import squal.errors as sqerr
-# import squal.gates as gt
 
-# 1: Fine tune syntax by writing a front-end API to interact with the simulation.
-#    (a) Change the Gate class so that it has the attribute target_qubit, so that
-#    the functions in gates.py return Gate objects. Adapt QCSim and unit tests
-#    accordingly. (DONT DO, MAKE API HANDLE)
-#    (b) Flesh out Program class in API with means of doing measurement. (DONE)
-#    (c) Fix unit tests. (DONE)
-#    (d) Fix imports in files. (DONE)
-# 2: Build in standard gates as functions. Stich front and back end of classical
-#    gates together(DONE). Write tests for multi-qubit gates. (changed anys to maxs, keep an eye on them)
-#    Add all necessary control operations (IF gets its own sublines) for classical bits and other functions.
-#    Write more unit tests for classical logic gates.
-# 3: Test out 5-Qubit Deutsch-Jozsa Algorithm.
+# 1: Build in standard gates as functions.
+#    (a) Stich front and back end of classical gates together (DONE).
+#    (b) Write tests for multi-qubit gates. (changed anys to maxs, keep an eye on them)
+#    (c) Flesh out while instruction (DONE)
+#    (d) Write more unit tests for classical logic gates.
+# 3: Test out Fourier Transf.
 # 4: Implement noise modeling.
-# 4: Generate QASM and Quil descriptions of code.
+# 4: Generate QASM and Quil descriptions of code(?)
 '''
 Core components of squal are defined here.
 '''

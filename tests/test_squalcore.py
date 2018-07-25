@@ -459,7 +459,7 @@ class ClassicalControlValidInput(unittest.TestCase):
 
     def test_classical_logic_gates(self):
         '''
-        Verifys the action of classical logic gates.
+        Verifies the action of classical logic gates.
         '''
 
         # Prepare the classical register state 0, 1, 0
@@ -531,6 +531,76 @@ class ClassicalControlValidInput(unittest.TestCase):
 
         self.test_program.add_cinstr(gt.EXCHANGE(4, 3))
         np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [1, 0, 1, 1, 0])
+
+class ControlFlowValidInput(unittest.TestCase):
+
+    def setUp(self):
+        # Test machine
+        self.test_qc = sq.QCSim()
+
+        # Test program
+        self.test_program = sq.Program()
+
+    def test_if_then_else(self):
+        '''
+        Verifies proper control flow with if/then, and if/then/else statements.
+        '''
+
+        # Initialize the classical register to the state [0, 1]
+        self.test_program.add_instr(gt.X(0))
+        self.test_program.measure(0, 1)
+
+        if_branch = sq.Program()
+        else_branch = sq.Program()
+
+        if_branch.add_instr(gt.X(0))
+        if_branch.measure(0, 2)
+
+        else_branch.measure(0, 2)
+
+        self.test_program.if_then_else(0, if_branch, else_branch)
+
+        # Should return [0, 1, 1]
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [0, 1, 1])
+
+        # Now let's use the control bit 1 to see if we return [0, 1, 0]
+        self.test_program.rm_instr()
+        self.test_program.if_then_else(1, if_branch, else_branch)
+
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [0, 1, 0])
+
+        # Now let's not specify an else branch, and verify that a 0 as the control
+        # bit results in execution passing on
+
+        self.test_program.rm_instr()
+        self.test_program.if_then_else(0, if_branch)
+
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [0, 1])
+
+    def test_while_loop_hadamard(self):
+        '''
+        Hadamard state measurement of 0 should end appropriately constucted .while_loop().
+        '''
+
+        test_register = 0
+        save_register = 1
+        # First place 1 into the classical test register location
+        self.test_program.add_cinstr(gt.TRUE(test_register))
+        # Now initialize a superposition state
+        self.test_program.add_instr(gt.H(0))
+
+        # Body of while loop
+        body = sq.Program()
+
+        body.measure(0, save_register)
+        body.add_cinstr(gt.COPY(save_register, test_register))
+        body.add_cinstr(gt.NOT(save_register))
+        body.add_instr(gt.H(0))
+        self.test_program.while_loop(test_register, body)
+        print(self.test_program)
+        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [0, 1])
+        np.testing.assert_array_almost_equal(self.test_qc.quantum_state(self.test_program).state(),\
+                                      np.array([1/np.sqrt(2), 1/np.sqrt(2)]))
 
 if __name__ == '__main__':
     unittest.main()

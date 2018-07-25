@@ -310,6 +310,49 @@ class QCSim:
         # Note that the change_state() method automatically normalizes new_state
         self.__quantum_reg.change_state(new_state.tolist())
 
+    def __if(self, test_loc, then_branch, else_branch = None):
+        '''
+        Uses the contents of the classical register at the test location to
+        evaluate either then_branch, or else_branch (if specified).
+        '''
+
+        # First we do sanity checks on the specified test index
+        if not isinstance(test_loc, int):
+            raise TypeError("Classical register test index must be integer.")
+
+        if test_loc > len(self.__classical_reg) - 1 or test_loc < 0:
+            raise ValueError("Classical register test location out of range.")
+
+        # Now the logic of the if/else instructions
+        if self.__classical_reg[test_loc] == 1:
+            for line in then_branch:
+                self.__elementary_eval(line)
+
+        elif else_branch != None:
+            for line in else_branch:
+                self.__elementary_eval(line)
+
+        else:
+            pass
+
+
+    def __while(self, test_loc, body):
+        '''
+        Uses the contents of the classical register at the test location to
+        control loop.
+        '''
+
+        # First we do sanity checks on the specified test index
+        if not isinstance(test_loc, int):
+            raise TypeError("Classical register test index must be integer.")
+
+        if test_loc > len(self.__classical_reg) - 1 or test_loc < 0:
+            raise ValueError("Classical register test location out of range.")
+
+        while self.__classical_reg[test_loc] == 1:
+            for line in body:
+                self.__elementary_eval(line)
+
     def __reset(self):
         '''
         Resets the quantum and classical registers.
@@ -318,6 +361,54 @@ class QCSim:
         self.__classical_reg = [0]
         self.__q_size = 1
         self.__c_size = 1
+
+    def __elementary_eval(self, line):
+        '''
+        Primitive method for handing over a single instruction for execution.
+        '''
+
+        # If the line is a quantum instruction (Gate, *targets), hand the
+        # gate and targets over to self.__instr()
+        if isinstance(line[0], type(Gate())):
+            self.__instr(line[0], *line[1:])
+
+        # Otherwise, if the line is a measurement instruction
+        # ('MEASURE', q_reg_loc, optional c_reg_loc), hand the
+        # contents over to self.__measure()
+        elif line[0] == 'MEASURE':
+            q_loc = line[1]
+            c_loc = ''
+            if len(line) == 3:
+                c_loc = line[2]
+
+            self.__measure(q_loc, c_loc)
+
+        elif line[0] == 'WHILE':
+            test_loc = line[1]
+            body = line[2]
+            self.__while(test_loc, body)
+
+        elif line[0] == 'IF':
+            # Gets the classical register test location
+            test_loc = line[1]
+            # This branch happens when no 'else' is specified
+            if len(line) == 3:
+                then_branch = line[2]
+                self.__if(test_loc, then_branch)
+
+            # This branch only happens when an 'else' is specified
+            if len(line) == 4:
+                then_branch = line[2]
+                else_branch = line[3]
+                self.__if(test_loc, then_branch, else_branch = else_branch)
+
+            # Catch-all for malform 'IF' instructions since it should have
+            # length of either 3 or 4
+            elif len(line) != 3 and len(line) != 4:
+                raise TypeError("Improper syntax in 'IF' statement.")
+
+        elif line[0] in gt.CLASSICAL_OPS:
+            self.__cinstr(line[0], *line[1:])
 
     def execute(self, program):
         '''
@@ -328,28 +419,8 @@ class QCSim:
 
         # Run through each line of the program
         for program_line in program:
-            # If the line is a normal instruction (Gate, *targets), hand the
-            # gate and targets over to self.instr()
-            if isinstance(program_line[0], type(Gate())):
-                self.__instr(program_line[0], *program_line[1:])
+            self.__elementary_eval(program_line)
 
-            # Otherwise, if the line is a measurement instruction
-            # ('MEASURE', q_reg_loc, optional c_reg_loc), hand the
-            # contents over to self.measure()
-            elif program_line[0] == 'MEASURE':
-                q_loc = program_line[1]
-                c_loc = ''
-                if len(program_line) == 3:
-                    c_loc = program_line[2]
-
-                self.__measure(q_loc, c_loc)
-
-            elif program_line[0] in gt.CLASSICAL_OPS:
-                self.__cinstr(program_line[0], *program_line[1:])
-
-        # output_q_reg = self.quantum_reg()
-        # output_c_reg = self.classical_reg()
-        # output_q_reg = Qubit(self.__quantum_reg.state().tolist())
         output_c_reg = copy.deepcopy(self.__classical_reg)
 
         self.__reset()
@@ -366,21 +437,7 @@ class QCSim:
 
         # Run through each line of the program
         for program_line in program:
-            # If the line is a normal instruction (Gate, *targets), hand the
-            # gate and targets over to self.instr()
-            if isinstance(program_line[0], type(Gate())):
-                self.__instr(program_line[0], *program_line[1:])
-
-            # Otherwise, if the line is a measurement instruction
-            # ('MEASURE', q_reg_loc, optional c_reg_loc), hand the
-            # contents over to self.measure()
-            elif program_line[0] == 'MEASURE':
-                q_loc = program_line[1]
-                c_loc = ''
-                if len(program_line) == 3:
-                    c_loc = program_line[2]
-
-                self.__measure(q_loc, c_loc)
+            self.__elementary_eval(program_line)
 
         output_q_reg = Qubit(self.__quantum_reg.state().tolist())
 
@@ -501,6 +558,52 @@ class Program():
 
         if isinstance(classical_loc, int) and classical_loc >= 0:
             self.__instructions.insert(position, ('MEASURE', qubit_loc, classical_loc))
+
+    def if_then_else(self, test_loc, if_branch, else_branch = None):
+        '''
+        Adds the instruction to execute the subprogram 'if_branch' if the
+        bit at classical register index 'test_loc' is 1. Otherwise, if an 'else_branch'
+        Program object is specified, that gets executed. If none is specified,
+        execution passes on.
+        '''
+
+        # First we check that the branches are valid Program objects
+        if not isinstance(if_branch, type(Program())):
+            raise TypeError("Branches of 'IF' statement must be Program objects.")
+
+        if not isinstance(else_branch, type(Program()))\
+            and not isinstance(else_branch, type(None)):
+            raise TypeError("Else branch of 'IF' statement, if specified, must be a Program object.")
+
+        # Now we construct the instruction
+        if not isinstance(else_branch, type(None)):
+            ite_instruction = ('IF', test_loc, if_branch.instructions(),\
+                               else_branch.instructions())
+
+        else:
+            ite_instruction = ('IF', test_loc, if_branch.instructions())
+
+        self.__instructions.append(ite_instruction)
+
+    def while_loop(self, test_loc, body):
+        '''
+        Adds the instruction to execute the subprogram 'body' while the
+        bit at classical register index 'test_loc' is 1.
+        '''
+
+        # First we check that the body is a valid program object
+        if not isinstance(body, type(Program())):
+            raise TypeError('Body of while statement must be a Program object.')
+
+        loop_instruction = ('WHILE', test_loc, body.instructions())
+        self.__instructions.append(loop_instruction)
+
+    def instructions(self):
+        '''
+        Helper method for returning a copy of the instructions in list form.
+        '''
+
+        return copy.deepcopy(self.__instructions)
 
     def __len__(self):
         return len(self.__instructions)
