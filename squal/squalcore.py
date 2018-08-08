@@ -2,11 +2,8 @@ import numpy as np
 import copy
 import squal.errors as sqerr
 
-# 1: Build in standard gates as functions.
-#    (a) Stich front and back end of classical gates together (DONE).
-#    (b) Write tests for multi-qubit gates. (changed anys to maxs, keep an eye on them)
-#    (c) Flesh out while instruction (DONE)
-#    (d) Write more unit tests for classical logic gates.
+# 1: Implement new_gate() function in gates module.
+# 2: Update unit tests.
 # 3: Test out Fourier Transf.
 # 4: Implement noise modeling.
 # 4: Generate QASM and Quil descriptions of code(?)

@@ -1,5 +1,6 @@
 import squal.api as sq
-from squal.gates import X, Z, H
+from squal.gates import X, Z, H, CNOT
+from squal.squalcore import Gate
 import numpy as np
 import math
 
@@ -14,6 +15,8 @@ oracle_type, oracle_value = np.random.randint(2), np.random.randint(2)
 
 oracle_type = 1
 if oracle_type == 0:
+    value = np.random.randint(2)
+    oracle_list = [value for i in range(2**n)]
     print("The oracle returns a constant value.")
 
 else:
@@ -40,6 +43,18 @@ else:
 
         else:
             raise ValueError("Something went wrong with the oracle!")
+# use the oracle list to construct our black box
+black_box = np.zeros((2**(n+1), 2**(n+1)))
+for i in range(len(oracle_list)):
+    if oracle_list[i] == 0:
+        pass
+    else:
+        index_loc = i + 2**n
+        if index_loc < 2**(n+1):
+            black_box[i + 2**n][i + 2**n]
+        else:
+            pass
+black_box_gate = (Gate(black_box, name="Oracle"), 0)
 
 dj_program = sq.Program()
 
@@ -51,31 +66,37 @@ for i in range(n):
 dj_program.add_instr(X(n))
 dj_program.add_instr(H(n))
 
-# Query the oracle
-if oracle_type == 0:    # constant oracle
-    if oracle_value == 1:
-        # We pick up an overall minus sign (equiv to X answer qubit)
-        dj_program.add_instr(X(n))
-    else:
-        pass
+# query the oracle
+dj_program.add_instr(black_box_gate)
 
-if oracle_type == 1:    # balanced oracle
-    for i in range(len(oracle_list)):
-        return_value = oracle_list[i]
-        if return_value == 0:
-            pass
-        if return_value == 1:
-            # Get quantum register location corresponding to i, then
-            # if the target_qubit is zero, apply X(0)Z(0)X(0),
-            # or if the target_qubit is not zero, apply Z(target_qubit)
-            if i != 0:
-                target_qubit = int(math.floor(np.log2(i)))
-                dj_program.add_instr(Z(target_qubit))
-            else:
-                target_qubit = 0
-                dj_program.add_instr(X(0))
-                dj_program.add_instr(Z(0))
-                dj_program.add_instr(X(0))
+# # Query the oracle
+# if oracle_type == 0:    # constant oracle
+#     if oracle_value == 1:
+#         # We pick up an overall minus sign (equiv to X answer qubit)
+#         dj_program.add_instr(X(n))
+#     else:
+#         pass
+#
+# if oracle_type == 1:    # balanced oracle
+#     for i in range(len(oracle_list)):
+#         # do mod 2 addition (flip qubit)
+#         return_value = oracle_list[i]
+#         if return_value == 0:
+#             pass
+#         if return_value == 1:
+#             # Get quantum register location corresponding to i, then
+#             # if the target_qubit is zero, apply X(0)Z(0)X(0),
+#             # or if the target_qubit is not zero, apply Z(target_qubit)
+#             if i != 0:
+#                 target_qubit = int(math.floor(np.log2(i)))
+#                 dj_program.add_instr(X(target_qubit))
+#                 dj_program.add_instr(Z(target_qubit))
+#                 dj_program.add_instr(X(target_qubit))
+#             else:
+#                 target_qubit = 0
+#                 dj_program.add_instr(X(0))
+#                 dj_program.add_instr(Z(0))
+#                 dj_program.add_instr(X(0))
 
 # Apply H to the first n qubits
 for i in range(n):
@@ -88,4 +109,5 @@ for i in range(n):
 
 qc = sq.QCSim()
 
-print(qc.quantum_state(dj_program))
+# print(qc.quantum_state(dj_program))
+print(qc.execute(dj_program))
