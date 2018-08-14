@@ -615,4 +615,4 @@ class Program():
             program_rep += '\n'
 
         program_rep += '}'
-        return str(program_rep)
+        return program_rep

@@ -11,6 +11,19 @@ an output_bit. The binary gates take input_bit_1 and input_bit_2, and return an
 output_bit. COPY and EXCHANGE classical gates are also implemented.
 '''
 
+def NEWGATE(matrix_rep, gate_name="Custom Gate", *target_qubits):
+
+    if len(target_qubits) == 0:
+        size = int(np.log2(len(matrix_rep[0])))
+
+        # Fake target qubits are necessary for the back end operation
+        # when no targets are specified.
+        fake_targets = [i for i in range(size)]
+        return (Gate(matrix_rep, name=gate_name), *fake_targets)
+
+    else:
+        return (Gate(matrix_rep, name=gate_name), *target_qubits)
+
 # Quantum gates
 
 def X(target_qubit):

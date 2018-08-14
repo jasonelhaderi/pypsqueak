@@ -2,11 +2,11 @@ import numpy as np
 import copy
 import squal.errors as sqerr
 
-# 1: Implement new_gate() function in gates module.
+# 1: Change NEWGATE() function in gates module to custom_gate(); implement
+#    a NEWGATE instruction within the program environment.
 # 2: Update unit tests.
-# 3: Test out Fourier Transf.
+# 3: Write example script for out Fourier Transform and other algorithms.
 # 4: Implement noise modeling.
-# 4: Generate QASM and Quil descriptions of code(?)
 '''
 Core components of squal are defined here.
 '''
