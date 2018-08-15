@@ -2,11 +2,12 @@ import numpy as np
 import copy
 import squal.errors as sqerr
 
-# 1: Change NEWGATE() function in gates module to custom_gate(); implement
-#    a NEWGATE instruction within the program environment.
-# 2: Update unit tests.
-# 3: Write example script for out Fourier Transform and other algorithms.
-# 4: Implement noise modeling.
+# 1: Implement noise modeling.
+# 2: Add instruction for defining new gates from old gates (DONE).
+# 3: Update unit tests.
+# 4: Write more example scripts.
+# Eventually: Have interpreter check that a given gate is either standard or
+#    previously declared.
 '''
 Core components of squal are defined here.
 '''
@@ -183,6 +184,9 @@ class Gate:
 
     def shape(self):
         return copy.deepcopy(self.__shape)
+
+    def name(self):
+        return self.__name
 
     def gate_product(self, *arg):
         # Returns the a Gate() that is the Kronecker product of self and *args

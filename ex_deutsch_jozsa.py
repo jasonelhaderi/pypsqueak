@@ -1,5 +1,5 @@
 import squal.api as sq
-from squal.gates import X, Z, H, CNOT, NEWGATE
+from squal.gates import X, Z, H, CNOT, custom_gate
 import numpy as np
 
 # Number of bits in the input bitstring.
@@ -60,7 +60,7 @@ for i in range(len(oracle_list)):
         else:
             pass
 
-black_box_gate = NEWGATE(black_box.tolist(), "ORACLE")
+black_box_gate = custom_gate(black_box.tolist(), "ORACLE")
 
 dj_program = sq.Program()
 

@@ -16,3 +16,6 @@ class InhomogenousInputError(TypeError):
 
 class NonUnitaryInputError(ValueError):
     pass
+
+class UndeclaredGateError(NotImplementedError):
+    pass
