@@ -2,12 +2,6 @@ import numpy as np
 import copy
 import squal.errors as sqerr
 
-# 1: Implement noise modeling.
-# 2: Add instruction for defining new gates from old gates (DONE).
-# 3: Update unit tests.
-# 4: Write more example scripts.
-# Eventually: Have interpreter check that a given gate is either standard or
-#    previously declared.
 '''
 Core components of squal are defined here.
 '''
@@ -48,9 +42,9 @@ class Qubit:
         elif all(element == 0 for element in some_vector):
             raise sqerr.NullVectorError('State cannot be the null vector.')
 
-        # Checks that some_vector has length 2n with integer n.
-        elif len(some_vector) % 2 != 0:
-            raise sqerr.WrongShapeError('Input state must have even length.')
+        # Checks that some_vector has length greater than 1 which is a power of 2.
+        elif not is_power_2(len(some_vector)) or len(some_vector) == 1:
+            raise sqerr.WrongShapeError('Input state must have a length > 1 which is a power of 2.')
 
     def change_state(self, new_state):
         # Checks that input is valid.
@@ -118,7 +112,7 @@ class Qubit:
 
     def qubit_product(self, *arg):
         if len(arg) == 0:
-            raise TypeError('Input cannot be empty.')
+            raise TypeError('Must specify at least one argument.')
         new_qubits = self.__state
 
         for argument in arg:
@@ -151,12 +145,12 @@ class Gate:
 
         # Checks that the input is a square matrix
         self.__shape = (len(some_matrix), len(some_matrix[0]))
-        if self.__shape[0] % 2 != 0:
-            raise sqerr.WrongShapeError('Gate must be nXn with even n.')
+        if not is_power_2(self.__shape[0]) or self.__shape[0] == 1:
+            raise sqerr.WrongShapeError('Gate must be nXn with n > 1 a power of 2.')
 
         for row in some_matrix:
             if len(row) != self.__shape[0]:
-                raise sqerr.WrongShapeError('Gate must be a square matrix.')
+                raise sqerr.WrongShapeError('Input not a square matrix.')
 
         # Checks that the name (if any) is a string
         if not isinstance(name, str) and not isinstance(name, type(None)):
@@ -218,3 +212,18 @@ class Gate:
 
         else:
             return str(self.__state)
+
+# Helper function for testing Qubit/Gate sizes
+def is_power_2(n):
+    if not n == int(n):
+        return False
+
+    n = int(n)
+    if n == 1:
+        return True
+
+    elif n >= 2:
+        return is_power_2(n/2.0)
+
+    else:
+        return False

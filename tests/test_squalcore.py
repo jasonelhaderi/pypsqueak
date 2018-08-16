@@ -3,8 +3,7 @@ import unittest
 import numpy as np
 import cmath
 
-# Modules to test (context simply enables importing the 'squal' package)
-import context
+# squal modules
 import squal.gates as gt
 from squal.squalcore import Qubit, Gate
 import squal.api as sq
@@ -83,7 +82,7 @@ class QubitInvalidInput(unittest.TestCase):
             self.assertRaises(TypeError, self.test_qubit.change_state, candidate)
 
     def test_wrong_length(self):
-        '''self.__validate_state.() should fail for self.change_state(input with length not even)'''
+        '''self.__validate_state.() should fail for self.change_state(input with length = 1 or not power 2)'''
 
         wrong_length = [[0, 1, 34],
                         [7]]
@@ -160,12 +159,12 @@ class GateInvalidInput(unittest.TestCase):
         for candidate in wrong_shapes:
             self.assertRaises(sqerr.WrongShapeError, sq.Gate, candidate)
 
-    def test_not_even(self):
-        '''Gate should fail if matrix is not 2nX2n for integer n'''
+    def test_not_power_2(self):
+        '''Gate should fail if matrix is not nXn for n == 1 or n a power of 2'''
 
         uneven_shape = [[1, 0, 0],
-                         [0, 1, 0],
-                         [0, 0, 1]]
+                        [0, 1, 0],
+                        [0, 0, 1]]
 
         self.assertRaises(sqerr.WrongShapeError, sq.Gate, uneven_shape)
 

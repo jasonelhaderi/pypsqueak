@@ -1,5 +1,7 @@
 import numpy as np
 import copy
+import sys
+import traceback
 import cmath
 
 from squal.squalcore import Qubit, Gate
@@ -103,6 +105,7 @@ class QCSim:
 
             operator = left_eye.gate_product(gate)
 
+        # If no Kraus operators are specified, evaluation of new register state is simple.
         if kraus_ops == None:
             new_reg_state = np.dot(operator.state(), self.__quantum_reg.state())
             self.__quantum_reg.change_state(new_reg_state.tolist())
@@ -463,6 +466,9 @@ class QCSim:
         elif line[0] in gt.CLASSICAL_OPS:
             self.__cinstr(line[0], *line[1:])
 
+        else:
+            raise sqerr.UndeclaredGateError("Unknown Gate.")
+
     def execute(self, program):
         '''
         Returns the contents of the classical register after executing a program.
@@ -470,9 +476,21 @@ class QCSim:
         if not isinstance(program, type(Program())):
             raise TypeError('Can only execute Program objects.')
 
+        line_number = 0
         # Run through each line of the program
         for program_line in program:
-            self.__elementary_eval(program_line)
+            line_number += 1
+            try:
+                self.__elementary_eval(program_line)
+            except Exception as ex:
+                # Generate error message
+                message = ""
+                message += type(ex).__name__
+                message += " occcured on program line {}: ".format(line_number)
+                message += "{}".format(program_line)
+                print(message)
+                print(traceback.format_exc())
+                sys.exit(1)
 
         output_c_reg = copy.deepcopy(self.__classical_reg)
 
@@ -488,9 +506,21 @@ class QCSim:
         if not isinstance(program, type(Program())):
             raise TypeError('Can only execute Program objects.')
 
+        line_number = 0
         # Run through each line of the program
         for program_line in program:
-            self.__elementary_eval(program_line)
+            line_number += 1
+            try:
+                self.__elementary_eval(program_line)
+            except Exception as ex:
+                # Generate error message
+                message = ""
+                message += type(ex).__name__
+                message += " occcured on program line {}: ".format(line_number)
+                message += "{}".format(program_line)
+                print(message)
+                print(traceback.format_exc())
+                sys.exit(1)
 
         output_q_reg = Qubit(self.__quantum_reg.state().tolist())
 
@@ -553,8 +583,45 @@ class Program():
         if position == None:
             position = len(self)
 
+        # Checks that the position is valid
         if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
             raise ValueError('Invalid program position number. Out of range.')
+
+        # Check that kraus_ops is a list
+        if not isinstance(kraus_ops, list):
+            raise TypeError("The argument kraus_ops must be a nonempty list.")
+
+        # Check that kraus_ops has at least two elements
+        if len(kraus_ops) < 2:
+            raise ValueError("The list kraus_ops must have at least two elements.")
+
+        # Check that each element of kraus_ops is a ndarray
+        if not all(isinstance(op, type(np.array([]))) for op in kraus_ops):
+            raise TypeError("Each operator in kraus_ops must be a numpy array.")
+
+        # Check that each operator in kraus_ops has the correct shape.
+        kraus_shape = kraus_ops[0].shape
+        if kraus_shape[0] != kraus_shape[1]:
+            raise sqerr.WrongShapeError("Kraus operators must be square matricies.")
+
+        for op in kraus_ops:
+            if op.shape != kraus_shape:
+                raise sqerr.WrongShapeError("Kraus operator shapes must be homogeneous.")
+
+        # Check that the size of the Kraus operators agrees with the gate size
+        gate_shape = gate_target_tuple[0].state().shape
+        if gate_shape != kraus_shape:
+            raise sqerr.WrongShapeError("Size mismatch between Kraus operators and gate.")
+
+
+        # Check that kraus_ops satisfy completeness
+        identity = np.identity(kraus_shape[0])
+        sum = np.matmul(np.conjugate(kraus_ops[0].T), kraus_ops[0])
+        for i in range(1, len(kraus_ops)):
+            sum += np.matmul(np.conjugate(kraus_ops[i].T), kraus_ops[i])
+
+        if not np.allclose(sum, identity):
+            raise sqerr.NormalizationError("Kraus operators must satisfy completeness relation.")
 
         if not isinstance(gate_target_tuple, tuple):
             raise TypeError('gate_target_tuple must be a tuple of Gate object followed by target qubits.')

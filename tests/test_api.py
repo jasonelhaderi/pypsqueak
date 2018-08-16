@@ -3,8 +3,7 @@ import unittest
 import numpy as np
 import cmath
 
-# Modules to test (context simply enables importing the 'squal' package)
-import context
+# squal modules
 import squal.gates as gt
 import squal.api as sq
 import squal.errors as sqerr
