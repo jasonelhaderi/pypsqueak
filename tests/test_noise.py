@@ -3,11 +3,11 @@ import unittest
 import numpy as np
 import cmath
 
-# squal modules
-import squal.gates as gt
-import squal.api as sq
-import squal.errors as sqerr
-from squal.noise import damping_map, depolarization_map, b_flip_map
+# SQUEAK modules
+import pypsqueak.gates as gt
+import pypsqueak.api as sq
+import pypsqueak.errors as sqerr
+from pypsqueak.noise import damping_map, depolarization_map, b_flip_map
 
 class NoiseInstructionInvalidInput(unittest.TestCase):
 

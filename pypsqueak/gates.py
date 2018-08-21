@@ -1,7 +1,7 @@
 import numpy as np
 import cmath
 
-from squal.squalcore import Gate
+from pypsqueak.squeakcore import Gate
 
 '''
 Functions implementing standard quantum gates on one or more target_qubits, and
@@ -29,11 +29,11 @@ def custom_gate(matrix_rep, gate_name="Custom Gate", *target_qubits):
 
 def NEWGATE(*gate_target_tuples, gate_name="NEW GATE"):
     '''
-    Defines a new named gate within the squal environment using one or more tuples
+    Defines a new named gate within the SQUEAK environment using one or more tuples
     of the form (Gate(), *target_qubits), where any provided target_qubits get thrown
     away. The assumption is that each of the gates in the list will act on identical
     targets. Throws an error if the gate shapes don't match. Returns a two-item
-    list: the first item is the squal Program instruction (applying gates in
+    list: the first item is the SQUEAK Program instruction (applying gates in
     left to right order), and the second item is a function implementing the gate
     in the same way that standard gates are implemented.
     '''

@@ -1,9 +1,9 @@
 import numpy as np
 import copy
-import squal.errors as sqerr
+import pypsqueak.errors as sqerr
 
 '''
-Core components of squal are defined here.
+Core components of pypSQUEAK are defined here.
 '''
 
 class Qubit:

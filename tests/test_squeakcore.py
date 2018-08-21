@@ -3,11 +3,11 @@ import unittest
 import numpy as np
 import cmath
 
-# squal modules
-import squal.gates as gt
-from squal.squalcore import Qubit, Gate
-import squal.api as sq
-import squal.errors as sqerr
+# pypSQUEAK modules
+import pypsqueak.gates as gt
+from pypsqueak.squeakcore import Qubit, Gate
+import pypsqueak.api as sq
+import pypsqueak.errors as sqerr
 
 # Qubit Tests
 

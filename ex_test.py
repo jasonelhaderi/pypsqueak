@@ -1,5 +1,5 @@
-import squal.api as sq
-import squal.gates
+import pypsqueak.api as sq
+import pypsqueak.gates
 import numpy as np
 
 p = sq.Program()

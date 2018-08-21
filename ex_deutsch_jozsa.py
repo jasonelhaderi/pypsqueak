@@ -1,5 +1,5 @@
-import squal.api as sq
-from squal.gates import X, Z, H, CNOT, custom_gate
+import pypsqueak.api as sq
+from pypsqueak.gates import X, Z, H, CNOT, custom_gate
 import numpy as np
 
 # Number of bits in the input bitstring.

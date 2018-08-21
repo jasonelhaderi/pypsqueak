@@ -3,10 +3,10 @@ import unittest
 import numpy as np
 import cmath
 
-# squal modules
-import squal.gates as gt
-import squal.api as sq
-import squal.errors as sqerr
+# pypSQUEAK modules
+import pypsqueak.gates as gt
+import pypsqueak.api as sq
+import pypsqueak.errors as sqerr
 
 class QCSimSuccess(unittest.TestCase):
 
@@ -130,7 +130,7 @@ class QCSimSuccess(unittest.TestCase):
 
     def test_new_gate_valid(self):
         '''
-        Verifies that new gates get interpreted correctly within the squal environment.
+        Verifies that new gates get interpreted correctly within the SQUEAK environment.
         '''
 
         # First let's try the product XYZ.

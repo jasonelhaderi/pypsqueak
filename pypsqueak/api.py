@@ -4,9 +4,9 @@ import sys
 import traceback
 import cmath
 
-from squal.squalcore import Qubit, Gate
-import squal.gates as gt
-import squal.errors as sqerr
+from pypsqueak.squeakcore import Qubit, Gate
+import pypsqueak.gates as gt
+import pypsqueak.errors as sqerr
 
 '''
 An integrated platform for simulating quantum operations is provided with the
@@ -794,7 +794,7 @@ class Program():
 
     def new_gate(self, new_gate_instruction):
         '''
-        Defines a new gate within the squal environment and returns a function to
+        Defines a new gate within the SQUEAK environment and returns a function to
         the user implementing that gate. The instruction takes the form
         ('NEWGATE', gate_name, gates), where each gate in the list gates is assumed
         to act on the same target qubits and are applied in left to right order.

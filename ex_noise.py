@@ -1,6 +1,6 @@
-import squal.api as sq
-from squal.gates import X, I
-from squal.noise import damping_map
+import pypsqueak.api as sq
+from pypsqueak.gates import X, I
+from pypsqueak.noise import damping_map
 
 p = sq.Program()
 qc = sq.QCSim()

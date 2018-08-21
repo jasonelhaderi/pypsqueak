@@ -1,14 +1,14 @@
 import numpy as np
 
-from squal.squalcore import Gate
-import squal.gates
-import squal.api as sq
+from pypsqueak.squeakcore import Gate
+import pypsqueak.gates
+import pypsqueak.api as sq
 
 '''
 Quantum operations map a distribution of pure states to another distribution of
 pure states. This can be theoretically represented with the evolution of a density
 matrix via a set of Kraus operators (also called operation elements). Since the
-squal quantum register is implemented as a pure state, we implement quantum
+pypSQUEAK quantum register is implemented as a pure state, we implement quantum
 operations by interpreting the coefficients in each term of (sum E*rho*E^{dagger})
 as the probability that the operation E gets applied to a state. More precisely,
 we take with probability p = <psi|E^{dagger}E|psi> that the transformation
