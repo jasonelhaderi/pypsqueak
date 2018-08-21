@@ -9,12 +9,13 @@ import pypsqueak.gates as gt
 import pypsqueak.errors as sqerr
 
 '''
-An integrated platform for simulating quantum operations is provided with the
-QCSim class, and a data structure for writing programs which can be executed by it is
-provided with the Program class.
+A qunatum/classical virtual machine is provided with the qcVirtualMachine class.
+The Program class provides a data structure for writing programs to be executed
+by the virtual machine. Since it is intended as the front-end for pypSQUEAK, the
+Program class incorporates some basic linter functionality.
 '''
 
-class QCSim:
+class qcVirtualMachine:
     '''
     Simulates of the action of a quantum/classical computer with arbitrary memory.
     '''
@@ -534,7 +535,7 @@ class QCSim:
 class Program():
     '''
     Program class provides a data structure for composing and organizing programs
-    to run on QCSim.
+    to run on qcVirtualMachine.
     '''
 
     def __init__(self):

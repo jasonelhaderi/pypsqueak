@@ -3,7 +3,7 @@ from pypsqueak.gates import X, I
 from pypsqueak.noise import damping_map
 
 p = sq.Program()
-qc = sq.QCSim()
+qcvm = sq.qcVirtualMachine()
 
 # Prep the 1 state
 p.add_instr(X(2))
@@ -16,7 +16,7 @@ zeros = 0
 ones = 0
 n_runs = 100
 for i in range(n_runs):
-    if qc.execute(p)[0] == 0:
+    if qcvm.execute(p)[0] == 0:
         zeros += 1
     else:
         ones += 1

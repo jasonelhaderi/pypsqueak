@@ -143,7 +143,7 @@ def CNOT(control_qubit, target_qubit):
 
     return (Gate(matrix_rep, name='CNOT'), control_qubit, target_qubit)
 
-# Classical gates (prepended with '_' are for the backend in QCSim)
+# Classical gates (prepended with '_' are for the backend in qcVirtualMachine)
 
 def NOT(c_reg_loc):
     return 'NOT', c_reg_loc

@@ -87,7 +87,7 @@ for i in range(n):
 for i in range(n):
     dj_program.measure(i, i)
 
-qc = sq.QCSim()
+qcvm = sq.qcVirtualMachine()
 # print(dj_program)
 # Let's try this out a whole bunch of times!
 n_tries = 10
@@ -96,7 +96,7 @@ ones = 0
 print("Conducting {} trials...".format(n_tries))
 
 for i in range(n_tries):
-    result = qc.execute(dj_program)
+    result = qcvm.execute(dj_program)
     print(result)
     if any(result):
         ones += 1

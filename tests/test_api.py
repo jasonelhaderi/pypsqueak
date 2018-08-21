@@ -8,11 +8,11 @@ import pypsqueak.gates as gt
 import pypsqueak.api as sq
 import pypsqueak.errors as sqerr
 
-class QCSimSuccess(unittest.TestCase):
+class qcVirtualMachineSuccess(unittest.TestCase):
 
     def setUp(self):
         # Test machine
-        self.test_qc = sq.QCSim()
+        self.test_qcvm = sq.qcVirtualMachine()
 
         # Test program
         self.test_program = sq.Program()
@@ -20,13 +20,13 @@ class QCSimSuccess(unittest.TestCase):
     def test_known_measurement_results(self):
         '''Verifies that the proper post-measurement state occurs in several cases'''
 
-        # QCSim is initialized in the |0> state, so first let's measure a freshly
-        # initialized QCSim, and store what should be zero in the 1st classical register
+        # qcVirtualMachine is initialized in the |0> state, so first let's measure a freshly
+        # initialized qcVirtualMachine, and store what should be zero in the 1st classical register
         # location
         p = sq.Program()
         p.measure(0, 1)
-        output_q_reg =self.test_qc.quantum_state(p)
-        output_c_reg = self.test_qc.execute(p)
+        output_q_reg =self.test_qcvm.quantum_state(p)
+        output_c_reg = self.test_qcvm.execute(p)
         np.testing.assert_array_equal(output_q_reg.state(), np.array([1, 0]))
         np.testing.assert_array_equal(output_c_reg, [0, 0])
 
@@ -36,8 +36,8 @@ class QCSimSuccess(unittest.TestCase):
         p.rm_instr()
         p.add_instr(gt.X(0))
         p.measure(0, 6)
-        output_q_reg =self.test_qc.quantum_state(p)
-        output_c_reg = self.test_qc.execute(p)
+        output_q_reg =self.test_qcvm.quantum_state(p)
+        output_c_reg = self.test_qcvm.execute(p)
         np.testing.assert_array_equal(output_q_reg.state(), np.array([0, 1]))
         np.testing.assert_array_equal(output_c_reg, [0, 0, 0, 0, 0, 0, 1])
 
@@ -51,8 +51,8 @@ class QCSimSuccess(unittest.TestCase):
         p.measure(1, 3)
         p.measure(2, 2)
         p.measure(0)
-        output_q_reg =self.test_qc.quantum_state(p)
-        output_c_reg = self.test_qc.execute(p)
+        output_q_reg =self.test_qcvm.quantum_state(p)
+        output_c_reg = self.test_qcvm.execute(p)
         np.testing.assert_array_equal(output_q_reg.state(),\
                                       np.array([0, 0, 0, 0, 1, 0, 0, 0]))
         np.testing.assert_array_equal(output_c_reg, [0, 0, 1, 0])
@@ -81,7 +81,7 @@ class QCSimSuccess(unittest.TestCase):
                    1/np.sqrt(2) * np.array([1, 0, 0, 0, -1, 0, 0, 0])]
 
         for test_pair in zip(test_programs, results):
-            q_reg_output = self.test_qc.quantum_state(test_pair[0])
+            q_reg_output = self.test_qcvm.quantum_state(test_pair[0])
             np.testing.assert_array_almost_equal(q_reg_output.state(), test_pair[1])
 
     def test_add_distant_qubit(self):
@@ -91,7 +91,7 @@ class QCSimSuccess(unittest.TestCase):
         '''
 
         self.test_program.add_instr(gt.I(2))
-        output_q_reg = self.test_qc.quantum_state(self.test_program)
+        output_q_reg = self.test_qcvm.quantum_state(self.test_program)
         state_000 = np.array([1, 0, 0, 0, 0, 0, 0, 0])
         np.testing.assert_array_equal(output_q_reg.state(), state_000)
 
@@ -103,30 +103,30 @@ class QCSimSuccess(unittest.TestCase):
         i_gate = gt.I(0)[0]
 
         # Verify that |001> gets swapped to |100>
-        self.test_qc._QCSim__instr(i_gate, 2)
-        self.test_qc._QCSim__quantum_reg.change_state([0, 1, 0, 0, 0, 0, 0, 0])
-        self.test_qc._QCSim__swap(0, 2)
+        self.test_qcvm._qcVirtualMachine__instr(i_gate, 2)
+        self.test_qcvm._qcVirtualMachine__quantum_reg.change_state([0, 1, 0, 0, 0, 0, 0, 0])
+        self.test_qcvm._qcVirtualMachine__swap(0, 2)
         state_100 = np.array([0, 0, 0, 0, 1, 0, 0, 0])
-        np.testing.assert_array_almost_equal(self.test_qc._QCSim__quantum_reg.state(), state_100)
+        np.testing.assert_array_almost_equal(self.test_qcvm._qcVirtualMachine__quantum_reg.state(), state_100)
 
-        self.test_qc._QCSim__reset()
+        self.test_qcvm._qcVirtualMachine__reset()
 
         # Verify that |100> gets swapped to |010> when qubits 1 and 2 are swapped
-        self.test_qc._QCSim__instr(i_gate, 2)
-        self.test_qc._QCSim__quantum_reg.change_state([0, 0, 0, 0, 1, 0, 0, 0])
-        self.test_qc._QCSim__swap(1, 2)
+        self.test_qcvm._qcVirtualMachine__instr(i_gate, 2)
+        self.test_qcvm._qcVirtualMachine__quantum_reg.change_state([0, 0, 0, 0, 1, 0, 0, 0])
+        self.test_qcvm._qcVirtualMachine__swap(1, 2)
         state_010 = np.array([0, 0, 1, 0, 0, 0, 0, 0])
-        np.testing.assert_array_almost_equal(self.test_qc._QCSim__quantum_reg.state(), state_010)
+        np.testing.assert_array_almost_equal(self.test_qcvm._qcVirtualMachine__quantum_reg.state(), state_010)
 
-        self.test_qc._QCSim__reset()
+        self.test_qcvm._qcVirtualMachine__reset()
 
         # Verify that (|011> - |010>)/sqrt(2) gets swapped to (|101> - |100>)/sqrt(2)
         # when qubits 1 and 2 are swapped
-        self.test_qc._QCSim__instr(i_gate, 2)
-        self.test_qc._QCSim__quantum_reg.change_state([0, 0, -1, 1, 0, 0, 0, 0])
-        self.test_qc._QCSim__swap(1, 2)
+        self.test_qcvm._qcVirtualMachine__instr(i_gate, 2)
+        self.test_qcvm._qcVirtualMachine__quantum_reg.change_state([0, 0, -1, 1, 0, 0, 0, 0])
+        self.test_qcvm._qcVirtualMachine__swap(1, 2)
         state_superposition = (1/np.sqrt(2)) * np.array([0, 0, 0, 0, -1, 1, 0, 0])
-        np.testing.assert_array_almost_equal(self.test_qc._QCSim__quantum_reg.state(), state_superposition)
+        np.testing.assert_array_almost_equal(self.test_qcvm._qcVirtualMachine__quantum_reg.state(), state_superposition)
 
     def test_new_gate_valid(self):
         '''
@@ -138,7 +138,7 @@ class QCSimSuccess(unittest.TestCase):
                                          gate_name="ImagIden"))
         self.test_program.add_instr(gt.H(0))
         self.test_program.add_instr(Ij(0))
-        np.testing.assert_array_almost_equal(self.test_qc.quantum_state(self.test_program).state(),\
+        np.testing.assert_array_almost_equal(self.test_qcvm.quantum_state(self.test_program).state(),\
                                              (1j / np.sqrt(2)) * np.array([1, 1]))
 
         # Now let's check the product CNOT SWAP acting on |10>. First erase the program.
@@ -156,15 +156,15 @@ class QCSimSuccess(unittest.TestCase):
                                                 [0, 1, 0, 0],
                                                 [0, 0, 1, 0]]))
         # Now check the program correctly evaluates to |11>.
-        np.testing.assert_array_equal(self.test_qc.quantum_state(self.test_program).state(),\
+        np.testing.assert_array_equal(self.test_qcvm.quantum_state(self.test_program).state(),\
                                       np.array([0, 0, 0, 1]))
 
 
-class QCSimFailure(unittest.TestCase):
+class qcVirtualMachineFailure(unittest.TestCase):
 
     def setUp(self):
         # Test machine
-        self.test_qc = sq.QCSim()
+        self.test_qcvm = sq.qcVirtualMachine()
 
         # Test program
         self.test_program = sq.Program()
@@ -176,7 +176,7 @@ class QCSimFailure(unittest.TestCase):
         '''
 
         i_gate = gt.I(0)[0]
-        self.assertRaises(TypeError, self.test_qc._QCSim__instr, i_gate)
+        self.assertRaises(TypeError, self.test_qcvm._qcVirtualMachine__instr, i_gate)
 
     def test_instr_negative_loc(self):
         '''
@@ -185,7 +185,7 @@ class QCSimFailure(unittest.TestCase):
         '''
 
         i_gate = gt.I(0)[0]
-        self.assertRaises(ValueError, self.test_qc._QCSim__instr, i_gate, -1)
+        self.assertRaises(ValueError, self.test_qcvm._qcVirtualMachine__instr, i_gate, -1)
 
     def test_instr_non_int_loc(self):
         '''
@@ -194,7 +194,7 @@ class QCSimFailure(unittest.TestCase):
         '''
 
         i_gate = gt.I(0)[0]
-        self.assertRaises(TypeError, self.test_qc._QCSim__instr, i_gate, 1.1)
+        self.assertRaises(TypeError, self.test_qcvm._qcVirtualMachine__instr, i_gate, 1.1)
 
     def test_gate_and_reg_mismatch(self):
         '''
@@ -203,7 +203,7 @@ class QCSimFailure(unittest.TestCase):
         '''
 
         i_gate = gt.I(0)[0]
-        self.assertRaises(sqerr.WrongShapeError, self.test_qc._QCSim__instr, i_gate, 0, 1)
+        self.assertRaises(sqerr.WrongShapeError, self.test_qcvm._qcVirtualMachine__instr, i_gate, 0, 1)
 
     def test_duplicate_q_reg_locs(self):
         '''
@@ -215,22 +215,22 @@ class QCSimFailure(unittest.TestCase):
         x_gate = gt.X(0)[0]
         i_x_gate_product = i_gate.gate_product(x_gate)
 
-        self.assertRaises(ValueError, self.test_qc._QCSim__instr, i_x_gate_product, 1, 1)
+        self.assertRaises(ValueError, self.test_qcvm._qcVirtualMachine__instr, i_x_gate_product, 1, 1)
 
     def test_swap_non_int_input(self):
         '''
         The private self.__swap() method should fail with non-integer input.
         '''
 
-        self.assertRaises(TypeError, self.test_qc._QCSim__swap, *['peas', []])
+        self.assertRaises(TypeError, self.test_qcvm._qcVirtualMachine__swap, *['peas', []])
 
     def test_negative_reg_loc(self):
         '''
         The private self.__measure() method must fail with negative registers.
         '''
 
-        self.assertRaises(ValueError, self.test_qc._QCSim__measure, -1)
-        self.assertRaises(ValueError, self.test_qc._QCSim__measure, 0, -1)
+        self.assertRaises(ValueError, self.test_qcvm._qcVirtualMachine__measure, -1)
+        self.assertRaises(ValueError, self.test_qcvm._qcVirtualMachine__measure, 0, -1)
 
     def test_swap_index_out_of_range(self):
         '''
@@ -242,16 +242,16 @@ class QCSimFailure(unittest.TestCase):
         i_gate = gt.I(0)[0]
         x_gate = gt.X(0)[0]
 
-        self.test_qc._QCSim__instr(i_gate, 2)
-        self.test_qc._QCSim__instr(i_gate, 0)
+        self.test_qcvm._qcVirtualMachine__instr(i_gate, 2)
+        self.test_qcvm._qcVirtualMachine__instr(i_gate, 0)
 
-        self.assertRaises(ValueError, self.test_qc._QCSim__swap, 0, 3)
+        self.assertRaises(ValueError, self.test_qcvm._qcVirtualMachine__swap, 0, 3)
 
 class ClassicalGateValidInput(unittest.TestCase):
 
     def setUp(self):
         # Test machine
-        self.test_qc = sq.QCSim()
+        self.test_qcvm = sq.qcVirtualMachine()
 
         # Test program
         self.test_program = sq.Program()
@@ -270,7 +270,7 @@ class ClassicalGateValidInput(unittest.TestCase):
         for i in range(3):
             self.test_program.add_cinstr(gt.NOT(i))
 
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [1, 0, 1])
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [1, 0, 1])
 
         # Erase program
         while len(self.test_program) > 0:
@@ -286,7 +286,7 @@ class ClassicalGateValidInput(unittest.TestCase):
         self.test_program.add_cinstr(gt.AND(5, 4, 2))
         self.test_program.add_cinstr(gt.AND(5, 5, 3))
 
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program),\
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program),\
                                       [0, 0, 0, 1, 0, 1])
 
         # Erase program
@@ -303,7 +303,7 @@ class ClassicalGateValidInput(unittest.TestCase):
         self.test_program.add_cinstr(gt.OR(5, 4, 2))
         self.test_program.add_cinstr(gt.OR(5, 5, 3))
 
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program),\
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program),\
                                       [0, 1, 1, 1, 0, 1])
 
         # Erase program
@@ -315,7 +315,7 @@ class ClassicalGateValidInput(unittest.TestCase):
         self.test_program.add_cinstr(gt.TRUE(0))
         self.test_program.add_cinstr(gt.FALSE(1))
 
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [1, 0])
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [1, 0])
 
         # Erase program
         while len(self.test_program) > 0:
@@ -326,16 +326,16 @@ class ClassicalGateValidInput(unittest.TestCase):
         for i in range(3):
             self.test_program.add_cinstr(gt.COPY(0, 2*i))
 
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [1, 0, 1, 0, 1])
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [1, 0, 1, 0, 1])
 
         self.test_program.add_cinstr(gt.EXCHANGE(4, 3))
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [1, 0, 1, 1, 0])
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [1, 0, 1, 1, 0])
 
 class ControlFlowValidInput(unittest.TestCase):
 
     def setUp(self):
         # Test machine
-        self.test_qc = sq.QCSim()
+        self.test_qcvm = sq.qcVirtualMachine()
 
         # Test program
         self.test_program = sq.Program()
@@ -360,13 +360,13 @@ class ControlFlowValidInput(unittest.TestCase):
         self.test_program.if_then_else(0, if_branch, else_branch)
 
         # Should return [0, 1, 1]
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [0, 1, 1])
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [0, 1, 1])
 
         # Now let's use the control bit 1 to see if we return [0, 1, 0]
         self.test_program.rm_instr()
         self.test_program.if_then_else(1, if_branch, else_branch)
 
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [0, 1, 0])
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [0, 1, 0])
 
         # Now let's not specify an else branch, and verify that a 0 as the control
         # bit results in execution passing on
@@ -374,7 +374,7 @@ class ControlFlowValidInput(unittest.TestCase):
         self.test_program.rm_instr()
         self.test_program.if_then_else(0, if_branch)
 
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [0, 1])
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [0, 1])
 
     def test_while_loop_hadamard(self):
         '''
@@ -397,8 +397,8 @@ class ControlFlowValidInput(unittest.TestCase):
         body.add_instr(gt.H(0))
         self.test_program.while_loop(test_register, body)
 
-        np.testing.assert_array_equal(self.test_qc.execute(self.test_program), [0, 1])
-        np.testing.assert_array_almost_equal(abs(self.test_qc.quantum_state(self.test_program).state()),\
+        np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [0, 1])
+        np.testing.assert_array_almost_equal(abs(self.test_qcvm.quantum_state(self.test_program).state()),\
                                       np.array([1/np.sqrt(2), 1/np.sqrt(2)]))
 
 

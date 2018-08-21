@@ -12,9 +12,6 @@ from pypsqueak.noise import damping_map, depolarization_map, b_flip_map
 class NoiseInstructionInvalidInput(unittest.TestCase):
 
     def setUp(self):
-        # Test machine
-        self.test_qc = sq.QCSim()
-
         # Test program
         self.test_program = sq.Program()
 
@@ -74,7 +71,7 @@ class NoiseInstructionInvalidInput(unittest.TestCase):
         # First construct a list of bad Kraus maps
         bad_kraus_maps = []
         bad_kraus_maps.append([damping_map(0.3)[0], damping_map(0.1)[1]])
-        bad_kraus_maps.append([b_flip_map(1.1)[0], depolarization_map(0.5)[0]])
+        bad_kraus_maps.append([b_flip_map(1.0)[0], depolarization_map(0.5)[0]])
 
         for bad_kraus in bad_kraus_maps:
             self.assertRaises(sqerr.NormalizationError,\
