@@ -1,2 +1,2 @@
-# squal
-An API for programming a quantum black box.
+# pypSQUEAK — Python Packaged Semantic Quantum Expression Architecture 
+A Python API for writing quantum programs in SQUEAK as well as a hybrid quantum/classical virtual machine for simulating their evalation.
