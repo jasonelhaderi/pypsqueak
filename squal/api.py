@@ -422,6 +422,9 @@ class QCSim:
         elif line[0] == 'NEWGATE':
             self.__declared_gates.append(line[1])
 
+        elif line[0] == 'GATEDEF' or line[0] == 'PGATEDEF':
+            self.__declared_gates.append(line[1])
+
         # If the line is a measurement instruction
         # ('MEASURE', q_reg_loc, optional c_reg_loc), hand the
         # contents over to self.__measure()
@@ -742,6 +745,52 @@ class Program():
 
         loop_instruction = ('WHILE', test_loc, body.instructions())
         self.__instructions.append(loop_instruction)
+
+    def gate_def(self, matrix_rep, gate_name=None):
+        '''
+        A convenience function for designing custom Gate objects by hand. Takes
+        in a user defined matrix_rep of the gate which is either a list or
+        a function returning a list. A function which returns a gate_target_tuple
+        is returned either here or by the api.
+        '''
+
+        if gate_name == None:
+            raise TypeError("User must specify a gate_name.")
+
+        if callable(matrix_rep):
+            # Make the PGATEDEF instruction
+            gate_def_instruction = ('PGATEDEF', str(gate_name), repr(matrix_rep))
+
+            # params is the list of parameters in the user defined matrix_rep function
+            def gate_function(params, *target_qubits):
+
+                # Generate dummy targets if no targets are specified. Assumes
+                # that the gate and register are the same size.
+                if len(target_qubits) == 0:
+                    size = int(np.log2(len(matrix_rep(*params)[0])))
+                    dummy_targets = [i for i in range(size)]
+                    return (Gate(matrix_rep(*params), name=gate_name), *dummy_targets)
+
+                else:
+                    return (Gate(matrix_rep(*params), name=gate_name), *target_qubits)
+
+            self.__instructions.append(gate_def_instruction)
+            return gate_function
+
+        else:
+            gate_def_instruction = ('GATEDEF', str(gate_name), repr(matrix_rep))
+
+            def gate_function(*target_qubits):
+                if len(target_qubits) == 0:
+                    size = int(np.log2(len(matrix_rep[0])))
+                    dummy_targets = [i for i in range(size)]
+                    return (Gate(matrix_rep, name=gate_name), *dummy_targets)
+
+                else:
+                    return (Gate(matrix_rep, name=gate_name), *target_qubits)
+
+            self.__instructions.append(gate_def_instruction)
+            return gate_function
 
     def new_gate(self, new_gate_instruction):
         '''
