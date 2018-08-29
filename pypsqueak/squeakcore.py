@@ -27,27 +27,32 @@ class Qubit:
                 raise TypeError('Input state must be a list, tuple, or numpy array.')
 
         # Checks that elements of some_vector are numeric.
-        elif any(isinstance(element, list) for element in some_vector):
-            raise TypeError('Elements of input state must be numeric.')
-
-        elif any(isinstance(element, tuple) for element in some_vector):
-            raise TypeError('Elements of input state must be numeric.')
-
-        elif any(isinstance(element, type(np.array([0]))) for element in some_vector):
-            raise TypeError('Elements of input state must be numeric.')
-
-        elif any(isinstance(element, dict) for element in some_vector):
-            raise TypeError('Elements of input state must be numeric.')
-
-        elif any(isinstance(element, str) for element in some_vector):
-            raise TypeError('Elements of input state must be numeric.')
+        for element in some_vector:
+            try:
+                element + 5
+            except:
+                raise TypeError('Elements of input state must be numeric.')
+        # elif any(isinstance(element, list) for element in some_vector):
+        #     raise TypeError('Elements of input state must be numeric.')
+        #
+        # elif any(isinstance(element, tuple) for element in some_vector):
+        #     raise TypeError('Elements of input state must be numeric.')
+        #
+        # elif any(isinstance(element, type(np.array([0]))) for element in some_vector):
+        #     raise TypeError('Elements of input state must be numeric.')
+        #
+        # elif any(isinstance(element, dict) for element in some_vector):
+        #     raise TypeError('Elements of input state must be numeric.')
+        #
+        # elif any(isinstance(element, str) for element in some_vector):
+        #     raise TypeError('Elements of input state must be numeric.')
 
         # Checks that the some_vector isn't null, or the null vector.
-        elif all(element == 0 for element in some_vector):
+        if all(element == 0 for element in some_vector):
             raise sqerr.NullVectorError('State cannot be the null vector.')
 
         # Checks that some_vector has length greater than 1 which is a power of 2.
-        elif not is_power_2(len(some_vector)) or len(some_vector) == 1:
+        if not is_power_2(len(some_vector)) or len(some_vector) == 1:
             raise sqerr.WrongShapeError('Input state must have a length > 1 which is a power of 2.')
 
     def change_state(self, new_state):
@@ -146,7 +151,15 @@ class Gate:
         # Checks that input is matrix-like
         elif any(not isinstance(element, list) and not isinstance(element, tuple)\
                                                     for element in some_matrix):
-            raise ValueError('Elements of input must be list or tuple.')
+            raise ValueError('Input must be list-like of list-likes.')
+
+        # Checks that the elements of input are numeric.
+        for row in some_matrix:
+            for element in row:
+                try:
+                    element + 5
+                except:
+                    raise TypeError("Elements of input must be numeric.")
 
         # Checks that the input is a square matrix
         self.__shape = (len(some_matrix), len(some_matrix[0]))

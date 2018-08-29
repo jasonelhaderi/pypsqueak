@@ -10,11 +10,15 @@ import pypsqueak.gates as gt
 import pypsqueak.errors as sqerr
 
 '''
-A qunatum/classical virtual machine is provided with the qcVirtualMachine class.
+A quantum/classical virtual machine is provided with the qcVirtualMachine class.
 The Program class provides a data structure for writing programs to be executed
 by the virtual machine. Since it is intended as the front-end for pypSQUEAK, the
 Program class incorporates some basic linter functionality.
 '''
+
+# Protected keywords and chars.
+_keywords = ['MEASURE', 'IF', 'THEN', 'ELSE', 'WHILE', 'DO', 'GATEDEF']
+_protected_chars = ['+', '-', '=', '*', '(', ')', ';', ':', '{', '}', '[', ']']
 
 class qcVirtualMachine:
     '''
@@ -32,8 +36,6 @@ class qcVirtualMachine:
         self.__declared_pgates = {}
         self.__builtin_qgates = {**gt.STD_GATES}
         self.__builtin_cgates = {**gt.CLASSICAL_OPS}
-        self.__keywords = ['MEASURE', 'IF', 'THEN', 'ELSE', 'WHILE', 'DO', 'GATEDEF']
-        self.__protected_chars = ['+', '-', '=', '*', '(', ')', ';', ':', '{', '}', '[', ']']
 
     def __instr(self, gate, *q_reg, kraus_ops=None):
         # If the list kraus_ops is provided, then the noisy quantum operation that
@@ -42,7 +44,7 @@ class qcVirtualMachine:
 
         # Check that at least one quantum_reg location is specified for the instruction
         if len(q_reg) == 0:
-            raise TypeError('One or more quantum register locations must be specified.')
+            raise IndexError('One or more quantum register locations must be specified.')
 
         # Check that there are no duplicate register locations for the instruction
         if len(q_reg) != len(set(q_reg)):
@@ -253,13 +255,13 @@ class qcVirtualMachine:
             self.__elementary_swap(simple_lower, simple_upper)
 
     def __elementary_swap(self, simple_lower, simple_upper):
-        # Raise ValueError if swap indicies reference location in the quantum_reg
+        # Raise IndexError if swap indicies reference location in the quantum_reg
         # that doesn't exist
         if simple_lower < 0 or simple_lower > (self.__q_size - 1):
-            raise ValueError("One or more register locations specified in swap doesn't exist.")
+            raise IndexError("One or more register locations specified in swap doesn't exist.")
 
         if simple_upper < 0 or simple_upper > (self.__q_size - 1):
-            raise ValueError("One or more register locations specified in swap doesn't exist.")
+            raise IndexError("One or more register locations specified in swap doesn't exist.")
 
         # Initialize identity and swap gates for later use (and throw away target qubit)
         I = Gate(gt._I)
@@ -521,12 +523,17 @@ class qcVirtualMachine:
         else:
             raise sqerr.UnknownInstruction("Unable to parse '{}'.".format(str(line)))
 
-    def execute(self, program):
+    def __interpreter(self, program):
         '''
-        Returns the contents of the classical register after executing a program.
+        Sequentially interprets each instruction in the program.
         '''
+
         if not isinstance(program, type(Program())):
             raise TypeError('Can only execute Program objects.')
+
+        # If the program is empty, add a null instruction for execution purposes.
+        if len(program) == 0:
+            program.null()
 
         instruction_number = 0
         # Run through each line of the program
@@ -543,6 +550,12 @@ class qcVirtualMachine:
                 print(message)
                 print(traceback.format_exc())
                 sys.exit(1)
+
+    def execute(self, program):
+        '''
+        Returns the contents of the classical register after executing a program.
+        '''
+        self.__interpreter(program)
 
         output_c_reg = copy.deepcopy(self.__classical_reg)
 
@@ -555,24 +568,8 @@ class qcVirtualMachine:
         Returns the state of the quantum register after executing a program.
         From a physical perspective, this is cheating!
         '''
-        if not isinstance(program, type(Program())):
-            raise TypeError('Can only execute Program objects.')
 
-        instruction_number = 0
-        # Run through each line of the program
-        for n, instruction in enumerate(program):
-            instruction_number += 1
-            try:
-                self.__elementary_eval(instruction)
-            except Exception as ex:
-                # Generate error message
-                message = ""
-                message += type(ex).__name__
-                message += " while parsing instruction {}: \n".format(instruction_number)
-                message += program.format_instr(n)
-                print(message)
-                print(traceback.format_exc())
-                sys.exit(1)
+        self.__interpreter(program)
 
         output_q_reg = Qubit(self.__quantum_reg.state())
 
@@ -611,22 +608,68 @@ class Program():
         else:
             return copy.deepcopy(self.__instructions)
 
-    # Here is where all the standardize methods are gonna get developed.
     def add_instr(self, gate_target_tuple, kraus_ops=None, **params):
         '''
         Appends a quantum or classical instruction to self.__instructions. If
         a list of Kraus matricies is provided, the quantum instruction is noisy.
         '''
 
+        # Check that the gate_target_tuple has the correct form.
+        if not isinstance(gate_target_tuple, tuple):
+            raise TypeError("gate_target_tuple must be a tuple.")
+
+        if len(gate_target_tuple) < 2:
+            raise TypeError("gate_target_tuple must have at least two elements (gate_name, target).")
+
+        name = gate_target_tuple[0]
+
         if not isinstance(gate_target_tuple, tuple):
                 raise TypeError('Argument must be a tuple of Gate name string followed by targets.')
 
-        if not isinstance(gate_target_tuple[0], str):
+        if not isinstance(name, str):
             raise TypeError('First element of argument must be a Gate name string.')
 
         for i in range(1, len(gate_target_tuple)):
             if not isinstance(gate_target_tuple[i], int) or gate_target_tuple[i] < 0:
-                raise ValueError('Targets must be indexed as nonnegative integers.')
+                raise IndexError('Targets must be indexed as nonnegative integers.')
+
+        # Check that the gate name isn't a keyword.
+        if name in _keywords:
+            raise NameError('{} is a protected keyword.'.format(name))
+
+        # Check that the gate name isn't an empty string.
+        if len(name) == 0:
+            raise NameError('Gate name must be a nonempty string.')
+
+        # Check that the gate name starts with a letter.
+        if not name[0].isalpha():
+            raise NameError('Gate name must start with a letter.')
+
+        # Check that the gate name doesn't contain any protected chars.
+        for char in name:
+            if char in _protected_chars:
+                raise NameError("Gate name contains protected char '{}'.".format(char))
+
+        # Check that if kraus_ops are given, they are in the form of a list of
+        # matrix like objects.
+        if not isinstance(kraus_ops, type(None)):
+            if len(kraus_ops) < 2:
+                raise TypeError("Must specify at least two Kraus operators for a quantum op.")
+            if not isinstance(kraus_ops, list):
+                raise TypeError("kraus_ops must be a list of matricies.")
+            for op in kraus_ops:
+                if not isinstance(op, (list, tuple, type(np.array([0])))):
+                    raise TypeError("kraus_ops must be a list of matricies.")
+                for row in op:
+                    try:
+                        len(row)
+                    except:
+                        raise TypeError("Rows of kraus_ops matricies must be list-like.")
+                    for element in row:
+                        try:
+                            element + 5
+                        except:
+                            raise TypeError("Elements of kraus_ops matricies must be numeric.")
 
         if len(params) == 0:
             params = None
@@ -646,17 +689,54 @@ class Program():
         classical register at the location classical_loc.
         '''
 
-        # If the classical_loc isn't valid, throw a ValueError
-        if (not isinstance(classical_loc, int) and not isinstance(classical_loc, type(None))):
-            raise ValueError('Classical register location must be an integer.')
+        # If the qubit_loc isn't valid, throw an IndexError
+        if not isinstance(qubit_loc, int) or qubit_loc < 0:
+            raise IndexError('Qubit register location must be a nonnegative integer.')
 
-        if not isinstance(classical_loc, type(None)):
-            if classical_loc < 0:
-                raise ValueError('Classical register location must be nonnegative.')
+        # If the classical_loc isn't valid, throw an IndexError
+        if classical_loc != None:
+            if not isinstance(classical_loc, int) or classical_loc < 0:
+                raise IndexError('Classical register location must be a nonnegative integer.')
 
         self.__instructions.append(('MEASURE', qubit_loc, classical_loc))
 
     def gate_def(self, name, matrix_rep):
+
+        # Force name to string.
+        name = str(name)
+
+        # Check if name is empty.
+        if len(name) == 0:
+            raise NameError('Gate name string must be nonempty.')
+
+        # Check if name is protected.
+        if name in _keywords or name in gt.CLASSICAL_OPS or name in gt.STD_GATES:
+            raise NameError('{} is a protected name.'.format(name))
+
+        # Check that name starts with a letter.
+        if not name[0].isalpha():
+            raise NameError('Gate name must start with a letter.')
+
+        # Check that no protected characters appear in name.
+        for char in name:
+            if char in _protected_chars:
+                raise NameError("Gate name contains protected char '{}'.".format(char))
+
+        # Check that matrix_rep is either a callable, a matrix-like combination
+        # of lists and tuples, or a numpy array.
+        if not callable(matrix_rep):
+            if not isinstance(matrix_rep, list) or not isinstance(matrix_rep, tuple)\
+                or not isinstance(matrix_rep, type(np.array([0]))):
+                raise TypeError('matrix_rep must be callable, tuple, list, or a numpy array.')
+            for row in matrix_rep:
+                if not isinstance(row, (list, tuple, type(np.array([0])))):
+                    raise TypeError('matrix_rep must be list-like of list-likes.')
+                for element in row:
+                    try:
+                        element + 5
+                    except:
+                        raise TypeError('Elements of matrix_rep must be numeric.')
+
 
         self.__instructions.append(('GATEDEF', name, matrix_rep))
 
@@ -675,14 +755,17 @@ class Program():
         execution passes on.
         '''
 
-        # First we check that the branches are valid Program objects
+        # Check that the c_reg_test_loc is a nonnegative integer
+        if not isinstance(c_reg_test_loc, int) or c_reg_test_loc < 0:
+            raise IndexError("Classical register test index must be a nonnegative integer.")
+
+        # Check that the branches are valid Program objects
         if not isinstance(then_branch, type(Program())):
             raise TypeError("Branches of 'IF' statement must be Program objects.")
 
-        if not isinstance(else_branch, type(Program()))\
-            and not isinstance(else_branch, type(None)):
-            raise TypeError("Else branch of 'IF' statement, if specified, must be a Program object.")
-
+        if else_branch != None:
+            if not isinstance(else_branch, type(Program())):
+                raise TypeError("Specified else branch of 'IF' statement must be a Program object.")
 
         ite_instruction = ('IF', c_reg_test_loc, then_branch, else_branch)
 
@@ -694,7 +777,11 @@ class Program():
         bit at classical register index 'c_reg_test_loc' is 1.
         '''
 
-        # First we check that the body is a valid program object
+        # Check that the c_reg_test_loc is a nonnegative integer
+        if not isinstance(c_reg_test_loc, int) or c_reg_test_loc < 0:
+            raise IndexError("Classical register test index must be a nonnegative integer.")
+
+        # Check that the body is a valid program object
         if not isinstance(loop_body, type(Program())):
             raise TypeError('Body of while statement must be a Program object.')
 
@@ -710,6 +797,10 @@ class Program():
         Formats the nth instruction in the program (zero-indexed) and returns it
         as a string.
         '''
+
+        if not isinstance(n, int) or n < 0:
+            raise IndexError('Program instruction number must be a nonnegative integer.')
+
         instruction = self.__instructions[n]
         instr_rep = ""
 

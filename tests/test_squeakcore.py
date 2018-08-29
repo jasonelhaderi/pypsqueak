@@ -146,8 +146,20 @@ class GateInvalidInput(unittest.TestCase):
         for candidate in not_list_of_rows:
             self.assertRaises(ValueError, sq.Gate, candidate)
 
+    def test_non_numeric_elements(self):
+        '''
+        Gate should fail to initialize if input elements aren't numeric.
+        '''
+
+        bad_matricies = [[[np.array([3, 4]), 6],[1, -1j]], (('item', 3), (3, 5))]
+
+        for matrix in bad_matricies:
+            self.assertRaises(TypeError, sq.Gate, matrix)
+
     def test_not_square(self):
-        '''Gate should fail to initialize if input doesn't have shape (n, n)'''
+        '''
+        Gate should fail to initialize if input doesn't have shape (n, n).
+        '''
 
         wrong_shapes = [[[]],
                         [[1, 2]],

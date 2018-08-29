@@ -26,7 +26,7 @@ class qcVirtualMachineSuccess(unittest.TestCase):
         # location
         p = sq.Program()
         p.measure(0, 1)
-        output_q_reg =self.test_qcvm.quantum_state(p)
+        output_q_reg = self.test_qcvm.quantum_state(p)
         output_c_reg = self.test_qcvm.execute(p)
         np.testing.assert_array_equal(output_q_reg.state(), np.array([1, 0]))
         np.testing.assert_array_equal(output_c_reg, [0, 0])
@@ -145,7 +145,7 @@ class qcVirtualMachineFailure(unittest.TestCase):
         '''
 
         i_gate = gt.I(0)[0]
-        self.assertRaises(TypeError, self.test_qcvm._qcVirtualMachine__instr, i_gate)
+        self.assertRaises(IndexError, self.test_qcvm._qcVirtualMachine__instr, i_gate)
 
     def test_instr_negative_loc(self):
         '''
@@ -214,7 +214,7 @@ class qcVirtualMachineFailure(unittest.TestCase):
         self.test_qcvm._qcVirtualMachine__instr(i_gate, 2)
         self.test_qcvm._qcVirtualMachine__instr(i_gate, 0)
 
-        self.assertRaises(ValueError, self.test_qcvm._qcVirtualMachine__swap, 0, 3)
+        self.assertRaises(IndexError, self.test_qcvm._qcVirtualMachine__swap, 0, 3)
 
 class ClassicalGateValidInput(unittest.TestCase):
 
@@ -370,6 +370,200 @@ class ControlFlowValidInput(unittest.TestCase):
         np.testing.assert_array_almost_equal(abs(self.test_qcvm.quantum_state(self.test_program).state()),\
                                       np.array([1/np.sqrt(2), 1/np.sqrt(2)]))
 
+class ProgramInvalidInput(unittest.TestCase):
+
+    def setUp(self):
+        # Test machine
+        self.test_qcvm = sq.qcVirtualMachine()
+
+        # Test program
+        self.test_program = sq.Program()
+
+        self.iden = np.eye(2)
+
+    def test_protected_names(self):
+        '''
+        gate_def and add_instr throw a NameError when the name is a keyword or builtin gate name.
+        '''
+
+        builtin_qgates = [key for key in self.test_qcvm._qcVirtualMachine__builtin_qgates]
+        builtin_cgates = [key for key in self.test_qcvm._qcVirtualMachine__builtin_cgates]
+        keywords = [word for word in sq._keywords]
+
+        for name in builtin_qgates:
+            self.assertRaises(NameError, self.test_program.gate_def, name, self.iden)
+
+        for name in builtin_cgates:
+            self.assertRaises(NameError, self.test_program.gate_def, name, self.iden)
+
+        for word in keywords:
+            self.assertRaises(NameError, self.test_program.gate_def, word, self.iden)
+            self.assertRaises(NameError, self.test_program.add_instr, (word, 0))
+
+    def test_first_char(self):
+        '''
+        gate_def and add_instr throw a NameError when the first char in a name
+        is not a letter.
+        '''
+
+        bad_names = ['1nae', '_fje', '.blahblah', '#fdsa', '&NAME']
+
+        for name in bad_names:
+            self.assertRaises(NameError, self.test_program.gate_def, name, self.iden)
+            self.assertRaises(NameError, self.test_program.add_instr, (name, 0))
+
+    def test_empty_name(self):
+        '''
+        gate_def and add_instr throw a NameError fails when the name is an empty string.
+        '''
+
+        self.assertRaises(NameError, self.test_program.gate_def, '', self.iden)
+        self.assertRaises(NameError, self.test_program.add_instr, ('', 0))
+
+    def test_malformed_names(self):
+        '''
+        gate_def and add_instr throw a NameError if name contains protected chars.
+        '''
+
+        prefix = 'blah'
+        sufix = 'blah'
+        bad_names = [prefix + char + sufix for char in sq._protected_chars]
+
+        for name in bad_names:
+            self.assertRaises(NameError, self.test_program.gate_def, name, self.iden)
+            self.assertRaises(NameError, self.test_program.add_instr, (name, 0))
+
+    def test_invalid_matrix_rep(self):
+        '''
+        gate_def throws a TypeError if matrix_rep is not a callable, a tuple/list of
+        tuples/lists, a numpy array, or if the elements are not numeric.
+        '''
+
+        bad_matricies = [{'mydict': 17},
+                         [],
+                         [(), ()],
+                         4,
+                         'apples',
+                         [[1, 'test'], [5, (2, 4)]],
+                         np.array([['train', 4], [12, 45]])]
+
+        for matrix in bad_matricies:
+            self.assertRaises(TypeError, self.test_program.gate_def, 'MyGate', matrix)
+
+    def test_bad_gate_target_tuples(self):
+        '''
+        add_instr throws a TypeError when handed a non-tuple or a malformed gate_target_tuple.
+        '''
+
+        not_tuples = [[34],
+                      {'key': 'val'},
+                      14,
+                      'thing']
+
+        bad_tuples = [(['name', 0], 3),
+                      (1, 3),
+                      ()]
+
+        for candidate in not_tuples:
+            self.assertRaises(TypeError, self.test_program.add_instr, candidate)
+
+        for candidate in bad_tuples:
+            self.assertRaises(TypeError, self.test_program.add_instr, candidate)
+
+    def test_gate_target_tuple_bad_index(self):
+        '''
+        add_instr throws an IndexError if specified targets are not nonnegative integers.
+        '''
+
+        bad_targets = [('name', -1), ('name', 3, 2, 7j), ('name', 1.1, 2.0, 0)]
+
+        for candidate in bad_targets:
+            self.assertRaises(IndexError, self.test_program.add_instr, candidate)
+
+    def test_bad_noise_input(self):
+        '''
+        add_instr throws a TypeError if kraus_ops isn't a list of matricies.
+        '''
+
+        bad_kraus_ops = [[],
+                         'nope',
+                         {},
+                         15,
+                         (),
+                         np.array([2, 3,]),
+                         [[14, 3], 5],
+                         [[[45, 2], [14, 3]], 3]]
+
+        for ops in bad_kraus_ops:
+            self.assertRaises(TypeError, self.test_program.add_instr, ('name', 0), kraus_ops=ops)
+
+    def test_bad_measurement_input(self):
+        '''
+        measure raises an IndexError when qubit_loc or an optional classical_loc is not a
+        nonnegative integer.
+        '''
+
+        bad_locs = [2.4, 8j, -2, 'twelve']
+
+        for loc in bad_locs:
+            self.assertRaises(IndexError, self.test_program.measure, loc)
+            self.assertRaises(IndexError, self.test_program.measure, 0, loc)
+
+    def test_if_then_else_bad_c_reg(self):
+        '''
+        if_then_else raises an IndexError when the specified c_reg_test_loc isn't
+        a nonnegative integer.
+        '''
+
+        bad_locs = [2.4, 8j, -2, 'twelve']
+
+        for loc in bad_locs:
+            self.assertRaises(IndexError, self.test_program.if_then_else, loc, sq.Program())
+
+    def test_if_then_else_non_program_branches(self):
+        '''
+        if_then_else raises a TypeError when given then_ or else_branches that
+        aren't Program objects.
+        '''
+
+        bad_branches = [[], 15, 'test', {}, ('instruction', 3)]
+
+        for branch in bad_branches:
+            self.assertRaises(TypeError, self.test_program.if_then_else, 0, branch)
+            self.assertRaises(TypeError, self.test_program.if_then_else, 0, sq.Program(), branch)
+
+    def test_while_loop_bad_c_reg(self):
+        '''
+        while_loop raises an IndexError when the specified c_reg_test_loc isn't
+        a nonnegative integer.
+        '''
+
+        bad_locs = [2.4, 8j, -2, 'twelve']
+
+        for loc in bad_locs:
+            self.assertRaises(IndexError, self.test_program.while_loop, loc, sq.Program())
+
+    def test_while_loop_non_program_body(self):
+        '''
+        while_loop raises a TypeError when given a loop_body that isn't a Program object.
+        '''
+
+        bad_bodies = [[], 15, 'test', {}, ('instruction', 3)]
+
+        for body in bad_bodies:
+            self.assertRaises(TypeError, self.test_program.while_loop, 0, body)
+
+    def test_format_instr_bad_index(self):
+        '''
+        format_instr raises an IndexError when given an instruction number that
+        is not a nonnegative integer or is out of range.
+        '''
+
+        self.test_program.add_instr(('some_gate', 3))
+        bad_locs = [2.4, 8j, -2, 'twelve', len(self.test_program)]
+
+        for loc in bad_locs:
+            self.assertRaises(IndexError, self.test_program.format_instr, loc)
 
 if __name__ == '__main__':
     unittest.main()

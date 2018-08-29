@@ -1,3 +1,5 @@
+import context
+
 import pypsqueak.api as sq
 from pypsqueak.gates import X, I
 from pypsqueak.noise import damping_map

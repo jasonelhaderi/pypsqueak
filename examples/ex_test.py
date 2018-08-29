@@ -1,3 +1,5 @@
+import context
+
 import pypsqueak.api as sq
 import pypsqueak.gates
 import numpy as np
