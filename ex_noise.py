@@ -8,7 +8,7 @@ qcvm = sq.qcVirtualMachine()
 # Prep the 1 state
 p.add_instr(X(2))
 # Send it through an amp decay channel with 0.3 chance of decay
-p.add_ninstr(I(2), damping_map(0.3))
+p.add_instr(I(2), damping_map(0.3))
 # measure the resulting qubit
 p.measure(2, 0)
 

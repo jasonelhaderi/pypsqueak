@@ -19,3 +19,6 @@ class NonUnitaryInputError(ValueError):
 
 class UndeclaredGateError(NotImplementedError):
     pass
+
+class UnknownInstruction(NotImplementedError):
+    pass

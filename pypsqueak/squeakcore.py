@@ -23,20 +23,24 @@ class Qubit:
     def __validate_state(self, some_vector):
         # Checks that some_vector is a list or tuple.
         if type(some_vector) != list and type(some_vector) != tuple:
-            raise TypeError('Input state must be a list or tuple.')
+            if not isinstance(some_vector, type(np.array([0]))):
+                raise TypeError('Input state must be a list, tuple, or numpy array.')
 
         # Checks that elements of some_vector are numeric.
         elif any(isinstance(element, list) for element in some_vector):
-            raise TypeError('Elements of input state cannot be lists.')
+            raise TypeError('Elements of input state must be numeric.')
 
         elif any(isinstance(element, tuple) for element in some_vector):
-            raise TypeError('Elements of input state cannot be tuples.')
+            raise TypeError('Elements of input state must be numeric.')
+
+        elif any(isinstance(element, type(np.array([0]))) for element in some_vector):
+            raise TypeError('Elements of input state must be numeric.')
 
         elif any(isinstance(element, dict) for element in some_vector):
-            raise TypeError('Elements of input state cannot be dicts.')
+            raise TypeError('Elements of input state must be numeric.')
 
         elif any(isinstance(element, str) for element in some_vector):
-            raise TypeError('Elements of input state cannot be strings.')
+            raise TypeError('Elements of input state must be numeric.')
 
         # Checks that the some_vector isn't null, or the null vector.
         elif all(element == 0 for element in some_vector):
@@ -121,12 +125,12 @@ class Qubit:
 
         if len(arg) == 1:
             new_qubits = np.kron(new_qubits, arg[0].state())
-            return Qubit(new_qubits.tolist())
+            return Qubit(new_qubits)
 
         if len(arg) > 1:
             for argument in arg:
                 new_qubits = np.kron(new_qubits, argument.state())
-            return Qubit(new_qubits.tolist())
+            return Qubit(new_qubits)
 
 class Gate:
     '''
@@ -136,7 +140,8 @@ class Gate:
     def __init__(self, some_matrix = [(1, 0), (0, 1)], name = None):
         # Checks that input is list-like
         if not isinstance(some_matrix, list) and not isinstance(some_matrix, tuple):
-            raise ValueError('Input must be list or tuple.')
+            if not isinstance(some_matrix, type(np.array([0]))):
+                raise ValueError('Input must be list, tuple, or numpy array.')
 
         # Checks that input is matrix-like
         elif any(not isinstance(element, list) and not isinstance(element, tuple)\
@@ -186,7 +191,7 @@ class Gate:
         # Returns the a Gate() that is the Kronecker product of self and *args
         new_gate = self.__state
         if len(arg) == 0:
-            return Gate(new_gate.tolist())
+            return Gate(new_gate)
 
         for argument in arg:
             if not isinstance(argument, type(Gate())):
@@ -194,12 +199,12 @@ class Gate:
 
         if len(arg) == 1:
             new_gate = np.kron(new_gate, arg[0].state())
-            return Gate(new_gate.tolist())
+            return Gate(new_gate)
 
         if len(arg) > 1:
             for argument in arg:
                 new_gate = np.kron(new_gate, argument.state())
-            return Gate(new_gate.tolist())
+            return Gate(new_gate)
 
     def __len__(self):
         # Note that this returns the number of qubits the gate acts on, NOT the
@@ -213,7 +218,7 @@ class Gate:
         else:
             return str(self.__state)
 
-# Helper function for testing Qubit/Gate sizes
+# Helper function for testing validity of Qubit/Gate sizes
 def is_power_2(n):
     if not n == int(n):
         return False

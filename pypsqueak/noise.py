@@ -92,11 +92,3 @@ def bp_flip_map(prob=0.1):
                                          [1j, 0]])
 
     return [static, flip]
-
-def append_noise(some_gate, kraus_ops):
-    # Generates an instruction ('NOISY', kraus_ops, gate_target_tuple).
-    # The compiler handles execution of the 'NOISY' instruction by computing
-    # the probabilities corresponding to each Kraus operator matrix in the
-    # kraus_ops list. Unit test that sum E^{dagger}E <= 1.
-
-    return ('NOISY', kraus_ops, some_gate)

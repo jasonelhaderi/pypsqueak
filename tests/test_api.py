@@ -4,6 +4,7 @@ import numpy as np
 import cmath
 
 # pypSQUEAK modules
+from pypsqueak.squeakcore import Qubit, Gate
 import pypsqueak.gates as gt
 import pypsqueak.api as sq
 import pypsqueak.errors as sqerr
@@ -100,7 +101,7 @@ class qcVirtualMachineSuccess(unittest.TestCase):
         Verifies known swaps in the private self.__swap() method.
         '''
         # We use a hard-coded identity gate to initialize extra qubits
-        i_gate = gt.I(0)[0]
+        i_gate = Gate(gt._I)
 
         # Verify that |001> gets swapped to |100>
         self.test_qcvm._qcVirtualMachine__instr(i_gate, 2)
@@ -127,38 +128,6 @@ class qcVirtualMachineSuccess(unittest.TestCase):
         self.test_qcvm._qcVirtualMachine__swap(1, 2)
         state_superposition = (1/np.sqrt(2)) * np.array([0, 0, 0, 0, -1, 1, 0, 0])
         np.testing.assert_array_almost_equal(self.test_qcvm._qcVirtualMachine__quantum_reg.state(), state_superposition)
-
-    def test_new_gate_valid(self):
-        '''
-        Verifies that new gates get interpreted correctly within the SQUEAK environment.
-        '''
-
-        # First let's try the product XYZ.
-        Ij = self.test_program.new_gate(gt.NEWGATE(gt.Z(0), gt.Y(0), gt.X(0),\
-                                         gate_name="ImagIden"))
-        self.test_program.add_instr(gt.H(0))
-        self.test_program.add_instr(Ij(0))
-        np.testing.assert_array_almost_equal(self.test_qcvm.quantum_state(self.test_program).state(),\
-                                             (1j / np.sqrt(2)) * np.array([1, 1]))
-
-        # Now let's check the product CNOT SWAP acting on |10>. First erase the program.
-        while len(self.test_program) > 0:
-            self.test_program.rm_instr()
-
-        self.test_program.add_instr(gt.X(1))
-        cnSwap = self.test_program.new_gate(gt.NEWGATE(gt.CNOT(0, 1), gt.SWAP(0, 1),\
-                                              gate_name="CNSWAP"))
-        self.test_program.add_instr(cnSwap(0, 1))
-        # First check that the gate has the right form.
-        np.testing.assert_array_equal(cnSwap(0, 1)[0].state(),\
-                                      np.array([[1, 0, 0, 0],
-                                                [0, 0, 0, 1],
-                                                [0, 1, 0, 0],
-                                                [0, 0, 1, 0]]))
-        # Now check the program correctly evaluates to |11>.
-        np.testing.assert_array_equal(self.test_qcvm.quantum_state(self.test_program).state(),\
-                                      np.array([0, 0, 0, 1]))
-
 
 class qcVirtualMachineFailure(unittest.TestCase):
 
@@ -208,11 +177,11 @@ class qcVirtualMachineFailure(unittest.TestCase):
     def test_duplicate_q_reg_locs(self):
         '''
         The private self.__instr() method must fail when duplicate
-        operational register locations are specified.
+        operational register locations are specified for a gate product.
         '''
 
-        i_gate = gt.I(0)[0]
-        x_gate = gt.X(0)[0]
+        i_gate = Gate(gt._I)
+        x_gate = Gate(gt._X)
         i_x_gate_product = i_gate.gate_product(x_gate)
 
         self.assertRaises(ValueError, self.test_qcvm._qcVirtualMachine__instr, i_x_gate_product, 1, 1)
@@ -239,8 +208,8 @@ class qcVirtualMachineFailure(unittest.TestCase):
         '''
 
         # Prepare the state |001>
-        i_gate = gt.I(0)[0]
-        x_gate = gt.X(0)[0]
+        i_gate = Gate(gt._I)
+        x_gate = Gate(gt._X)
 
         self.test_qcvm._qcVirtualMachine__instr(i_gate, 2)
         self.test_qcvm._qcVirtualMachine__instr(i_gate, 0)
@@ -268,7 +237,7 @@ class ClassicalGateValidInput(unittest.TestCase):
 
         # Negate each bit to yield 1, 0, 1
         for i in range(3):
-            self.test_program.add_cinstr(gt.NOT(i))
+            self.test_program.add_instr(gt.NOT(i))
 
         np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [1, 0, 1])
 
@@ -281,10 +250,10 @@ class ClassicalGateValidInput(unittest.TestCase):
         self.test_program.measure(0, 5)
 
         # Use the first for register locations as a truth table for AND
-        self.test_program.add_cinstr(gt.AND(4, 4, 0))
-        self.test_program.add_cinstr(gt.AND(4, 5, 1))
-        self.test_program.add_cinstr(gt.AND(5, 4, 2))
-        self.test_program.add_cinstr(gt.AND(5, 5, 3))
+        self.test_program.add_instr(gt.AND(4, 4, 0))
+        self.test_program.add_instr(gt.AND(4, 5, 1))
+        self.test_program.add_instr(gt.AND(5, 4, 2))
+        self.test_program.add_instr(gt.AND(5, 5, 3))
 
         np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program),\
                                       [0, 0, 0, 1, 0, 1])
@@ -298,10 +267,10 @@ class ClassicalGateValidInput(unittest.TestCase):
         self.test_program.measure(0, 5)
 
         # Use the first for register locations as a truth table for OR
-        self.test_program.add_cinstr(gt.OR(4, 4, 0))
-        self.test_program.add_cinstr(gt.OR(4, 5, 1))
-        self.test_program.add_cinstr(gt.OR(5, 4, 2))
-        self.test_program.add_cinstr(gt.OR(5, 5, 3))
+        self.test_program.add_instr(gt.OR(4, 4, 0))
+        self.test_program.add_instr(gt.OR(4, 5, 1))
+        self.test_program.add_instr(gt.OR(5, 4, 2))
+        self.test_program.add_instr(gt.OR(5, 5, 3))
 
         np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program),\
                                       [0, 1, 1, 1, 0, 1])
@@ -311,9 +280,9 @@ class ClassicalGateValidInput(unittest.TestCase):
             self.test_program.rm_instr()
 
         # Test TRUE and FALSE
-        self.test_program.add_cinstr(gt.TRUE(1))
-        self.test_program.add_cinstr(gt.TRUE(0))
-        self.test_program.add_cinstr(gt.FALSE(1))
+        self.test_program.add_instr(gt.TRUE(1))
+        self.test_program.add_instr(gt.TRUE(0))
+        self.test_program.add_instr(gt.FALSE(1))
 
         np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [1, 0])
 
@@ -322,13 +291,13 @@ class ClassicalGateValidInput(unittest.TestCase):
             self.test_program.rm_instr()
 
         # Check COPY and EXCHANGE
-        self.test_program.add_cinstr(gt.TRUE(0))
+        self.test_program.add_instr(gt.TRUE(0))
         for i in range(3):
-            self.test_program.add_cinstr(gt.COPY(0, 2*i))
+            self.test_program.add_instr(gt.COPY(0, 2*i))
 
         np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [1, 0, 1, 0, 1])
 
-        self.test_program.add_cinstr(gt.EXCHANGE(4, 3))
+        self.test_program.add_instr(gt.EXCHANGE(4, 3))
         np.testing.assert_array_equal(self.test_qcvm.execute(self.test_program), [1, 0, 1, 1, 0])
 
 class ControlFlowValidInput(unittest.TestCase):
@@ -384,7 +353,7 @@ class ControlFlowValidInput(unittest.TestCase):
         test_register = 0
         save_register = 1
         # First place 1 into the classical test register location
-        self.test_program.add_cinstr(gt.TRUE(test_register))
+        self.test_program.add_instr(gt.TRUE(test_register))
         # Now initialize a superposition state
         self.test_program.add_instr(gt.H(0))
 
@@ -392,8 +361,8 @@ class ControlFlowValidInput(unittest.TestCase):
         body = sq.Program()
 
         body.measure(0, save_register)
-        body.add_cinstr(gt.COPY(save_register, test_register))
-        body.add_cinstr(gt.NOT(save_register))
+        body.add_instr(gt.COPY(save_register, test_register))
+        body.add_instr(gt.NOT(save_register))
         body.add_instr(gt.H(0))
         self.test_program.while_loop(test_register, body)
 

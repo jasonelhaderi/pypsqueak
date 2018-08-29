@@ -20,7 +20,8 @@ class QubitValidInput(unittest.TestCase):
                     (24.0, 6),
                     [1 - 1j, 0j],
                     [-25.0, 9j],
-                    [-25.0, 9j, 3, 5]]
+                    [-25.0, 9j, 3, 5],
+                    np.array([1.0, 0])]
 
     def setUp(self):
         self.test_qubit = sq.Qubit()
@@ -118,8 +119,8 @@ class GateValidInput(unittest.TestCase):
     valid_gates = [X, Y, Z, I]
 
     def setUp(self):
-        self.gate_x = sq.Gate(self.X.tolist())
-        self.gate_y = sq.Gate(self.Y.tolist())
+        self.gate_x = sq.Gate(self.X)
+        self.gate_y = sq.Gate(self.Y)
         self.gate_z = sq.Gate(self.Z.tolist())
         self.gate_i = sq.Gate()
 
@@ -224,7 +225,7 @@ class GateProductValidInput(unittest.TestCase):
 
         gate_i = sq.Gate()
         gate_i_cubed = gate_i.gate_product(gate_i, gate_i)
-        gate_should_equal = sq.Gate(np.eye(8).tolist())
+        gate_should_equal = sq.Gate(np.eye(8))
 
         np.testing.assert_array_equal(gate_i_cubed.state(), gate_should_equal.state())
 

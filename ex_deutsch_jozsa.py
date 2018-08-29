@@ -3,10 +3,9 @@ from pypsqueak.gates import X, Z, H, CNOT, custom_gate
 import numpy as np
 
 # Number of bits in the input bitstring.
-n = 2
+n = 5
 
 oracle_type, oracle_value = np.random.randint(2), np.random.randint(2)
-oracle_type = 1
 # Construct a list of all output values for the oracle.
 if oracle_type == 0:
     print("Using a constant oracle with {}-bit input.".format(n))
@@ -60,12 +59,9 @@ for i in range(len(oracle_list)):
         else:
             pass
 
-# black_box_gate = custom_gate(black_box.tolist(), "ORACLE")
-
 dj_program = sq.Program()
-
-black_box_gate = dj_program.gate_def(black_box.tolist(), "ORACLE")
-dj_program.add_instr(black_box_gate())
+all_qubits = [i for i in range(n+1)]
+black_box_gate = dj_program.gate_def("ORACLE", black_box)
 
 # Prep qubits 0 to n - 1 in the Hadamard state.
 for i in range(n):
@@ -76,7 +72,7 @@ dj_program.add_instr(X(n))
 dj_program.add_instr(H(n))
 
 # Query the oracle.
-dj_program.add_instr(black_box_gate())
+dj_program.add_instr(black_box_gate(*all_qubits))
 
 # Apply H to the first n qubits.
 for i in range(n):
@@ -88,7 +84,7 @@ for i in range(n):
     dj_program.measure(i, i)
 
 qcvm = sq.qcVirtualMachine()
-# print(dj_program)
+
 # Let's try this out a whole bunch of times!
 n_tries = 10
 zeros = 0
@@ -97,7 +93,6 @@ print("Conducting {} trials...".format(n_tries))
 
 for i in range(n_tries):
     result = qcvm.execute(dj_program)
-    print(result)
     if any(result):
         ones += 1
     else:

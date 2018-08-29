@@ -2,6 +2,7 @@ import numpy as np
 import copy
 import sys
 import traceback
+import inspect
 import cmath
 
 from pypsqueak.squeakcore import Qubit, Gate
@@ -27,7 +28,12 @@ class qcVirtualMachine:
         self.__classical_reg = [0]
         self.__q_size = 1
         self.__c_size = 1
-        self.__declared_gates = []
+        self.__declared_gates = {}
+        self.__declared_pgates = {}
+        self.__builtin_qgates = {**gt.STD_GATES}
+        self.__builtin_cgates = {**gt.CLASSICAL_OPS}
+        self.__keywords = ['MEASURE', 'IF', 'THEN', 'ELSE', 'WHILE', 'DO', 'GATEDEF']
+        self.__protected_chars = ['+', '-', '=', '*', '(', ')', ';', ':', '{', '}', '[', ']']
 
     def __instr(self, gate, *q_reg, kraus_ops=None):
         # If the list kraus_ops is provided, then the noisy quantum operation that
@@ -54,13 +60,42 @@ class qcVirtualMachine:
             if location < 0:
                 raise ValueError('Quantum register locations must be nonnegative.')
 
-        # Check that the gate is either a standard gate or has been previously declared.
-        # Nested loop checks for rot and phase gates.
-        if (not any(gate.name() == std_gate for std_gate in gt.STD_GATES)) and\
-            (not any(gate.name() == usr_gate for usr_gate in self.__declared_gates)):
-                if (not any(gate.name()[:2] == std_gate for std_gate in gt.STD_GATES)) and\
-                    (not any(gate.name()[:4] == std_gate for std_gate in gt.STD_GATES)):
-                        raise sqerr.UndeclaredGateError("Unknown Gate.")
+        # Now we check the validity of the Kraus operators
+        if kraus_ops != None:
+            # Check that kraus_ops is a list
+            if not isinstance(kraus_ops, list):
+                raise TypeError("The argument kraus_ops must be a nonempty list.")
+
+            # Check that kraus_ops has at least two elements
+            if len(kraus_ops) < 2:
+                raise ValueError("The list kraus_ops must have at least two elements.")
+
+            # Check that each element of kraus_ops is a ndarray
+            if not all(isinstance(op, type(np.array([]))) for op in kraus_ops):
+                raise TypeError("Each operator in kraus_ops must be a numpy array.")
+
+            # Check that each operator in kraus_ops has the correct shape.
+            kraus_shape = kraus_ops[0].shape
+            if kraus_shape[0] != kraus_shape[1]:
+                raise sqerr.WrongShapeError("Kraus operators must be square matricies.")
+
+            for op in kraus_ops:
+                if op.shape != kraus_shape:
+                    raise sqerr.WrongShapeError("Kraus operator shapes must be homogeneous.")
+
+            # Check that the size of the Kraus operators agrees with the gate size
+            gate_shape = gate.state().shape
+            if gate_shape != kraus_shape:
+                raise sqerr.WrongShapeError("Size mismatch between Kraus operators and gate.")
+
+            # Check that kraus_ops satisfy completeness
+            identity = np.identity(kraus_shape[0])
+            sum = np.matmul(np.conjugate(kraus_ops[0].T), kraus_ops[0])
+            for i in range(1, len(kraus_ops)):
+                sum += np.matmul(np.conjugate(kraus_ops[i].T), kraus_ops[i])
+
+            if not np.allclose(sum, identity):
+                raise sqerr.NormalizationError("Kraus operators must satisfy completeness relation.")
 
         # If any of the specified quantum_reg locations have not yet been initialized,
         # initialize them (as well as intermediate reg locs) in the |0> state
@@ -74,7 +109,7 @@ class qcVirtualMachine:
             self.__q_size = len(self.__quantum_reg)
 
         # Initialize an identity gate for later use (and throw away target qubit)
-        I = gt.I(0)[0]
+        I = Gate(gt._I)
 
         # Swaps operational qubits into order specified by q_reg args by first
         # generating pairs of swaps to make (using a set to avoid duplicates)
@@ -109,7 +144,7 @@ class qcVirtualMachine:
         # If no Kraus operators are specified, evaluation of new register state is simple.
         if kraus_ops == None:
             new_reg_state = np.dot(operator.state(), self.__quantum_reg.state())
-            self.__quantum_reg.change_state(new_reg_state.tolist())
+            self.__quantum_reg.change_state(new_reg_state)
 
         else:
             # First we randomly choose one of the Kraus operators to apply, then we
@@ -136,7 +171,7 @@ class qcVirtualMachine:
             # Pick one of the transformed states according to probs
             new_state_index = np.random.choice([i for i in range(len(new_state_ensemble))], p=probs)
             new_reg_state = new_state_ensemble[new_state_index]
-            self.__quantum_reg.change_state(new_reg_state.tolist())
+            self.__quantum_reg.change_state(new_reg_state)
 
         # Swap qubits back into original order
         for swap_pair in swap_pairs:
@@ -150,7 +185,7 @@ class qcVirtualMachine:
         if not isinstance(name, str):
             raise ValueError('The name of the classical instruction must be a string.')
 
-        if name not in gt.CLASSICAL_OPS:
+        if name not in self.__builtin_cgates:
             raise ValueError('Unknown operation.')
 
         # If any of the target_bits are outside the range of the classical register,
@@ -171,7 +206,7 @@ class qcVirtualMachine:
                 input_values.pop()
 
             c_reg_index = target_bits[-1]
-            new_bit_value = gt.CLASSICAL_OPS[name](*input_values)
+            new_bit_value = self.__builtin_cgates[name](*input_values)
             self.__classical_reg[c_reg_index] = new_bit_value
 
         if name == 'COPY' or name == 'EXCHANGE':
@@ -183,7 +218,7 @@ class qcVirtualMachine:
                 c_reg_index_2 = target_bits[1]
                 input_values = [self.__classical_reg[target] for target in target_bits]
 
-                new_bit_values = gt.CLASSICAL_OPS[name](*input_values)
+                new_bit_values = self.__builtin_cgates[name](*input_values)
 
                 self.__classical_reg[c_reg_index_1] = new_bit_values[0]
                 self.__classical_reg[c_reg_index_2] = new_bit_values[1]
@@ -227,8 +262,8 @@ class qcVirtualMachine:
             raise ValueError("One or more register locations specified in swap doesn't exist.")
 
         # Initialize identity and swap gates for later use (and throw away target qubit)
-        I = gt.I(0)[0]
-        SWAP = gt.SWAP(0, 1)[0]
+        I = Gate(gt._I)
+        SWAP = Gate(gt._SWAP)
 
         # Note that lower index corresponds to right-hand factors, upper index to left-hand
         number_right_eye = int(simple_lower)
@@ -241,9 +276,7 @@ class qcVirtualMachine:
 
             raised_SWAP = left_eye.gate_product(SWAP, right_eye)
             new_swap_state = np.dot(raised_SWAP.state(), self.__quantum_reg.state())
-            self.__quantum_reg.change_state(new_swap_state.tolist())
-            # self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
-            # self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
+            self.__quantum_reg.change_state(new_swap_state)
 
         elif number_left_eye > 0 and number_right_eye == 0:
             # Prep identity factors
@@ -251,9 +284,7 @@ class qcVirtualMachine:
 
             raised_SWAP = left_eye.gate_product(SWAP)
             new_swap_state = np.dot(raised_SWAP.state(), self.__quantum_reg.state())
-            self.__quantum_reg.change_state(new_swap_state.tolist())
-            # self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
-            # self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
+            self.__quantum_reg.change_state(new_swap_state)
 
         elif number_left_eye == 0 and number_right_eye > 0:
             # Prep identity factors
@@ -261,16 +292,12 @@ class qcVirtualMachine:
 
             raised_SWAP = SWAP.gate_product(right_eye)
             new_swap_state = np.dot(raised_SWAP.state(), self.__quantum_reg.state())
-            self.__quantum_reg.change_state(new_swap_state.tolist())
-            # self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
-            # self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
+            self.__quantum_reg.change_state(new_swap_state)
 
         elif number_left_eye == 0 and number_right_eye == 0:
             raised_SWAP = SWAP
             new_swap_state = np.dot(raised_SWAP.state(), self.__quantum_reg.state())
-            self.__quantum_reg.change_state(new_swap_state.tolist())
-            # self.quantum_reg.state = np.dot(raised_SWAP.state, self.quantum_reg.state)
-            # self.quantum_reg = Qubit(self.quantum_reg.state.tolist())
+            self.__quantum_reg.change_state(new_swap_state)
 
     def __measure(self, q_reg_loc, c_reg_loc=''):
         # Performs a measurement on the qubit at q_reg_loc in the quantum_reg,
@@ -353,7 +380,7 @@ class qcVirtualMachine:
         projector_operator = np.diag(projector_diag)
         new_state = np.dot(projector_operator, self.__quantum_reg.state())
         # Note that the change_state() method automatically normalizes new_state
-        self.__quantum_reg.change_state(new_state.tolist())
+        self.__quantum_reg.change_state(new_state)
 
     def __if(self, test_loc, then_branch, else_branch = None):
         '''
@@ -406,25 +433,54 @@ class qcVirtualMachine:
         self.__classical_reg = [0]
         self.__q_size = 1
         self.__c_size = 1
-        self.__declared_gates = []
+        self.__declared_gates = {}
+        self.__declared_pgates = {}
 
     def __elementary_eval(self, line):
         '''
         Primitive method for handing over a single instruction for execution.
         '''
 
-        # If the line is a quantum instruction (Gate, *targets), hand the
+        # If the line is a quantum/classical gate instruction
+        #(gate_target_tuple, params_dict=None, kraus_ops=None),
+        # check if the gate name is built in or previously declared, then hand the
         # gate and targets over to self.__instr()
-        if isinstance(line[0], type(Gate())):
-            self.__instr(line[0], *line[1:])
+        if isinstance(line[0], tuple):
+            gate_name = line[0][0]
+            targets = line[0][1:]
+            params_dict = line[1]
+            k_op_list = line[2]
 
-        # For a NEWGATE instruction ('NEWGATE', gate_name, gates), we add the gate
-        # to the list of user declared gates.
-        elif line[0] == 'NEWGATE':
-            self.__declared_gates.append(line[1])
+            # Initialize a Gate object if a quantum gate instruction.
+            if gate_name in self.__builtin_qgates:
+                if callable(self.__builtin_qgates[gate_name]):
+                    gate_obj = Gate(self.__builtin_qgates[gate_name](**params_dict), name = gate_name)
+                else:
+                    gate_obj = Gate(self.__builtin_qgates[gate_name], name = gate_name)
+            elif gate_name in self.__declared_gates:
+                gate_obj = Gate(self.__declared_gates[gate_name], name = gate_name)
+            elif gate_name in self.__declared_pgates:
+                gate_obj = Gate(self.__declared_pgates[gate_name](**params_dict), name = gate_name)
+            # If the instruction is a classical gate, simply apply it.
+            elif gate_name in self.__builtin_cgates:
+                gate_obj = None
+            else:
+                raise sqerr.UndeclaredGateError("Unknown Gate '{}'.".format(gate_name))
 
-        elif line[0] == 'GATEDEF' or line[0] == 'PGATEDEF':
-            self.__declared_gates.append(line[1])
+            # Run the instruction.
+            if gate_obj == None:
+                self.__cinstr(gate_name, *targets)
+            else:
+                self.__instr(gate_obj, *targets, kraus_ops=k_op_list)
+
+        # For a GATEDEF instruction ('GATEDEF', name, matrix_rep),
+        elif line[0] == 'GATEDEF':
+            gate_name = line[1]
+            matrix_rep = line[2]
+            if callable(matrix_rep):
+                self.__declared_pgates[gate_name] = matrix_rep
+            else:
+                self.__declared_gates[gate_name] = matrix_rep
 
         # If the line is a measurement instruction
         # ('MEASURE', q_reg_loc, optional c_reg_loc), hand the
@@ -432,16 +488,10 @@ class qcVirtualMachine:
         elif line[0] == 'MEASURE':
             q_loc = line[1]
             c_loc = ''
-            if len(line) == 3:
+            if line[2] != None:
                 c_loc = line[2]
 
             self.__measure(q_loc, c_loc)
-
-        # Noise instructions also hand a list of Kraus operators to self.__instr()
-        elif line[0] == 'NOISY':
-            # line[1] is a list of Kraus operators as np arrays,
-            # line[2] is a gate_target_tuple
-            self.__instr(line[2][0], *line[2][1:], kraus_ops=line[1])
 
         elif line[0] == 'WHILE':
             test_loc = line[1]
@@ -449,29 +499,27 @@ class qcVirtualMachine:
             self.__while(test_loc, body)
 
         elif line[0] == 'IF':
+            if len(line) != 4:
+                raise TypeError("Improper syntax in 'IF' statement.")
             # Gets the classical register test location
             test_loc = line[1]
             # This branch happens when no 'else' is specified
-            if len(line) == 3:
+            if line[3] == None:
                 then_branch = line[2]
                 self.__if(test_loc, then_branch)
 
             # This branch only happens when an 'else' is specified
-            if len(line) == 4:
+            else:
                 then_branch = line[2]
                 else_branch = line[3]
                 self.__if(test_loc, then_branch, else_branch = else_branch)
 
-            # Catch-all for malform 'IF' instructions since it should have
-            # length of either 3 or 4
-            elif len(line) != 3 and len(line) != 4:
-                raise TypeError("Improper syntax in 'IF' statement.")
-
-        elif line[0] in gt.CLASSICAL_OPS:
-            self.__cinstr(line[0], *line[1:])
+        # Catches empty instruction
+        elif line[0] == None:
+            pass
 
         else:
-            raise sqerr.UndeclaredGateError("Unknown Gate.")
+            raise sqerr.UnknownInstruction("Unable to parse '{}'.".format(str(line)))
 
     def execute(self, program):
         '''
@@ -480,18 +528,18 @@ class qcVirtualMachine:
         if not isinstance(program, type(Program())):
             raise TypeError('Can only execute Program objects.')
 
-        line_number = 0
+        instruction_number = 0
         # Run through each line of the program
-        for program_line in program:
-            line_number += 1
+        for n, instruction in enumerate(program):
+            instruction_number += 1
             try:
-                self.__elementary_eval(program_line)
+                self.__elementary_eval(instruction)
             except Exception as ex:
                 # Generate error message
                 message = ""
                 message += type(ex).__name__
-                message += " occcured on program line {}: ".format(line_number)
-                message += "{}".format(program_line)
+                message += " while parsing instruction {}: \n".format(instruction_number)
+                message += program.format_instr(n)
                 print(message)
                 print(traceback.format_exc())
                 sys.exit(1)
@@ -510,23 +558,23 @@ class qcVirtualMachine:
         if not isinstance(program, type(Program())):
             raise TypeError('Can only execute Program objects.')
 
-        line_number = 0
+        instruction_number = 0
         # Run through each line of the program
-        for program_line in program:
-            line_number += 1
+        for n, instruction in enumerate(program):
+            instruction_number += 1
             try:
-                self.__elementary_eval(program_line)
+                self.__elementary_eval(instruction)
             except Exception as ex:
                 # Generate error message
                 message = ""
                 message += type(ex).__name__
-                message += " occcured on program line {}: ".format(line_number)
-                message += "{}".format(program_line)
+                message += " while parsing instruction {}: \n".format(instruction_number)
+                message += program.format_instr(n)
                 print(message)
                 print(traceback.format_exc())
                 sys.exit(1)
 
-        output_q_reg = Qubit(self.__quantum_reg.state().tolist())
+        output_q_reg = Qubit(self.__quantum_reg.state())
 
         self.__reset()
 
@@ -552,306 +600,263 @@ class Program():
             raise StopIteration
         return self.__instructions[self.__line]
 
-    def add_instr(self, gate_target_tuple, position=None):
+    def instructions(self):
         '''
-        Adds a quantum instruction to self.__instructions, with the default behavior
-        being to append the instruction.
+        Helper method for returning a copy of the instructions in list form.
         '''
 
-        # Sets default appending behavior
-        if position == None:
-            position = len(self)
+        if len(self) == 0:
+            return None
 
-        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
-            raise ValueError('Invalid program position number. Out of range.')
+        else:
+            return copy.deepcopy(self.__instructions)
+
+    # Here is where all the standardize methods are gonna get developed.
+    def add_instr(self, gate_target_tuple, kraus_ops=None, **params):
+        '''
+        Appends a quantum or classical instruction to self.__instructions. If
+        a list of Kraus matricies is provided, the quantum instruction is noisy.
+        '''
 
         if not isinstance(gate_target_tuple, tuple):
-            raise TypeError('Argument must be a tuple of Gate object followed by target qubits.')
+                raise TypeError('Argument must be a tuple of Gate name string followed by targets.')
 
-        elif not isinstance(gate_target_tuple[0], type(Gate())):
-            raise TypeError('First element of argument must be a Gate object.')
+        if not isinstance(gate_target_tuple[0], str):
+            raise TypeError('First element of argument must be a Gate name string.')
 
         for i in range(1, len(gate_target_tuple)):
             if not isinstance(gate_target_tuple[i], int) or gate_target_tuple[i] < 0:
-                raise ValueError('Target qubits must be nonnegative integers.')
+                raise ValueError('Targets must be indexed as nonnegative integers.')
 
-        self.__instructions.insert(position, gate_target_tuple)
+        if len(params) == 0:
+            params = None
 
-    def add_ninstr(self, gate_target_tuple, kraus_ops, position=None):
-        # Generates an instruction ('NOISY', kraus_ops, gate_target_tuple).
-        # The compiler handles execution of the 'NOISY' instruction by computing
-        # the probabilities corresponding to each Kraus operator matrix in the
-        # kraus_ops list. Unit test that sum E^{dagger}E <= 1.
+        self.__instructions.append((gate_target_tuple, params, kraus_ops))
 
-        # Sets default appending behavior
-        if position == None:
-            position = len(self)
+    def rm_instr(self):
+        if len(self.__instructions) > 0:
+            self.__instructions.pop()
+        else:
+            pass
 
-        # Checks that the position is valid
-        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
-            raise ValueError('Invalid program position number. Out of range.')
-
-        # Check that kraus_ops is a list
-        if not isinstance(kraus_ops, list):
-            raise TypeError("The argument kraus_ops must be a nonempty list.")
-
-        # Check that kraus_ops has at least two elements
-        if len(kraus_ops) < 2:
-            raise ValueError("The list kraus_ops must have at least two elements.")
-
-        # Check that each element of kraus_ops is a ndarray
-        if not all(isinstance(op, type(np.array([]))) for op in kraus_ops):
-            raise TypeError("Each operator in kraus_ops must be a numpy array.")
-
-        # Check that each operator in kraus_ops has the correct shape.
-        kraus_shape = kraus_ops[0].shape
-        if kraus_shape[0] != kraus_shape[1]:
-            raise sqerr.WrongShapeError("Kraus operators must be square matricies.")
-
-        for op in kraus_ops:
-            if op.shape != kraus_shape:
-                raise sqerr.WrongShapeError("Kraus operator shapes must be homogeneous.")
-
-        # Check that the size of the Kraus operators agrees with the gate size
-        gate_shape = gate_target_tuple[0].state().shape
-        if gate_shape != kraus_shape:
-            raise sqerr.WrongShapeError("Size mismatch between Kraus operators and gate.")
-
-
-        # Check that kraus_ops satisfy completeness
-        identity = np.identity(kraus_shape[0])
-        sum = np.matmul(np.conjugate(kraus_ops[0].T), kraus_ops[0])
-        for i in range(1, len(kraus_ops)):
-            sum += np.matmul(np.conjugate(kraus_ops[i].T), kraus_ops[i])
-
-        if not np.allclose(sum, identity):
-            raise sqerr.NormalizationError("Kraus operators must satisfy completeness relation.")
-
-        if not isinstance(gate_target_tuple, tuple):
-            raise TypeError('gate_target_tuple must be a tuple of Gate object followed by target qubits.')
-
-        elif not isinstance(gate_target_tuple[0], type(Gate())):
-            raise TypeError('First element of gate_target_tuple must be a Gate object.')
-
-        for i in range(1, len(gate_target_tuple)):
-            if not isinstance(gate_target_tuple[i], int) or gate_target_tuple[i] < 0:
-                raise ValueError('Target qubits must be nonnegative integers.')
-
-        self.__instructions.insert(position, ('NOISY', kraus_ops, gate_target_tuple))
-
-    def add_cinstr(self, classical_gate, position=None):
-        '''
-        Adds a classical unary or binary instruction to self.__instructions, with
-        the default behavior being to append the instruction.
-        '''
-
-        # Sets default appending behavior
-        if position == None:
-            position = len(self)
-
-        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
-            raise ValueError('Invalid program position number. Out of range.')
-
-        if not isinstance(classical_gate, tuple):
-            raise TypeError('Argument must be a tuple of gate name string followed by target bits.')
-
-        elif not isinstance(classical_gate[0], str):
-            raise TypeError('First element of argument must be a string (name of gate).')
-
-        self.__instructions.insert(position, classical_gate)
-
-    def rm_instr(self, position=None):
-        '''
-        Removes a generic instruction from self.__instructions by index. The default
-        behavior is to remove the last instruction.
-        '''
-
-        if position == None:
-            position = len(self) - 1
-
-        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
-            raise ValueError('Invalid program position number. Must be a nonnegative integer.')
-
-        del self.__instructions[position]
-
-    def measure(self, qubit_loc, classical_loc=None, position=None):
+    def measure(self, qubit_loc, classical_loc=None):
         '''
         Adds to self.__instructions a special instruction to measure the qubit
         at quantum register location qubit_loc and optionally save it in the
-        classical register at the location classical_loc. The default
-        behavior is to append the measurement to the end of the program, but
-        the instruction can be inserted by setting position to the desired program
-        line (zero-indexed).
+        classical register at the location classical_loc.
         '''
 
         # If the classical_loc isn't valid, throw a ValueError
         if (not isinstance(classical_loc, int) and not isinstance(classical_loc, type(None))):
-            raise ValueError('Classical register location must be a nonnegative integer.')
+            raise ValueError('Classical register location must be an integer.')
 
         if not isinstance(classical_loc, type(None)):
             if classical_loc < 0:
-                raise ValueError('Classical register location must be a nonnegative integer.')
+                raise ValueError('Classical register location must be nonnegative.')
 
-        # Sets default appending behavior
-        if position == None:
-            position = len(self)
+        self.__instructions.append(('MEASURE', qubit_loc, classical_loc))
 
-        # If the program position is out of range, throw a ValueError
-        if position > len(self.__instructions) or position < 0 or not isinstance(position, int):
-            raise ValueError('Invalid program position number. Out of range.')
+    def gate_def(self, name, matrix_rep):
 
-        # Branch in instruction depending on if a classical_loc is specified for
-        # storing the measurement.
-        if classical_loc == None:
-            self.__instructions.insert(position, ('MEASURE', qubit_loc))
+        self.__instructions.append(('GATEDEF', name, matrix_rep))
 
-        if isinstance(classical_loc, int) and classical_loc >= 0:
-            self.__instructions.insert(position, ('MEASURE', qubit_loc, classical_loc))
+        # Now we return a convenience function to the user for generating an instruction
+        # to apply the new gate.
+        def gate_func(*target_qubits):
+            return (name, *target_qubits)
 
-    def if_then_else(self, test_loc, if_branch, else_branch = None):
+        return gate_func
+
+    def if_then_else(self, c_reg_test_loc, then_branch, else_branch=None):
         '''
-        Adds the instruction to execute the subprogram 'if_branch' if the
-        bit at classical register index 'test_loc' is 1. Otherwise, if an 'else_branch'
+        Adds the instruction to execute the subprogram 'then_branch' if the
+        bit at classical register index 'c_reg_test_loc' is 1. Otherwise, if an 'else_branch'
         Program object is specified, that gets executed. If none is specified,
         execution passes on.
         '''
 
         # First we check that the branches are valid Program objects
-        if not isinstance(if_branch, type(Program())):
+        if not isinstance(then_branch, type(Program())):
             raise TypeError("Branches of 'IF' statement must be Program objects.")
 
         if not isinstance(else_branch, type(Program()))\
             and not isinstance(else_branch, type(None)):
             raise TypeError("Else branch of 'IF' statement, if specified, must be a Program object.")
 
-        # Now we construct the instruction
-        if not isinstance(else_branch, type(None)):
-            ite_instruction = ('IF', test_loc, if_branch.instructions(),\
-                               else_branch.instructions())
 
-        else:
-            ite_instruction = ('IF', test_loc, if_branch.instructions())
+        ite_instruction = ('IF', c_reg_test_loc, then_branch, else_branch)
 
         self.__instructions.append(ite_instruction)
 
-    def while_loop(self, test_loc, body):
+    def while_loop(self, c_reg_test_loc, loop_body):
         '''
-        Adds the instruction to execute the subprogram 'body' while the
-        bit at classical register index 'test_loc' is 1.
+        Adds the instruction to execute the subprogram 'loop_body' while the
+        bit at classical register index 'c_reg_test_loc' is 1.
         '''
 
         # First we check that the body is a valid program object
-        if not isinstance(body, type(Program())):
+        if not isinstance(loop_body, type(Program())):
             raise TypeError('Body of while statement must be a Program object.')
 
-        loop_instruction = ('WHILE', test_loc, body.instructions())
+        loop_instruction = ('WHILE', c_reg_test_loc, loop_body)
         self.__instructions.append(loop_instruction)
 
-    def gate_def(self, matrix_rep, gate_name=None):
+    def null(self):
+        null_instruction = (None, 0)
+        self.__instructions.append(null_instruction)
+
+    def format_instr(self, n):
         '''
-        A convenience function for designing custom Gate objects by hand. Takes
-        in a user defined matrix_rep of the gate which is either a list or
-        a function returning a list. A function which returns a gate_target_tuple
-        is returned either here or by the api.
+        Formats the nth instruction in the program (zero-indexed) and returns it
+        as a string.
         '''
+        instruction = self.__instructions[n]
+        instr_rep = ""
 
-        if gate_name == None:
-            raise TypeError("User must specify a gate_name.")
+        # Check for 'MEASURE' instruction ('MEASURE', qubit_loc, c_loc=None).
+        if instruction[0] == 'MEASURE':
+            instr_rep += instruction[0]
+            instr_rep += ' '
+            instr_rep += str(instruction[1])
+            # Check if c_reg_loc is specified to save measurement.
+            if instruction[2] != None:
+                instr_rep += ' '
+                instr_rep += str(instruction[2])
 
-        if callable(matrix_rep):
-            # Make the PGATEDEF instruction
-            gate_def_instruction = ('PGATEDEF', str(gate_name), repr(matrix_rep))
+            instr_rep += ';\n'
 
-            # params is the list of parameters in the user defined matrix_rep function
-            def gate_function(params, *target_qubits):
+        # Check for 'GATEDEF' instruction. (gdef, name, mrep)
+        elif instruction[0] == 'GATEDEF':
+            # First we construction the declaration line.
+            instr_rep += instruction[0]
+            # Append the gate name to the declaration line.
+            instr_rep += ' '
+            instr_rep += instruction[1]
+            # If ParametricGate def, include parameter names as argument in printing.
+            if callable(instruction[2]):
+                # Get list of parameter names
+                param_names = inspect.getfullargspec(instruction[2])[0]
+                n_params = len(param_names)
+                instr_rep += '('
+                for i in range(n_params):
+                    if i == n_params - 1:
+                        instr_rep += param_names[i]
+                        instr_rep += ')'
+                    else:
+                        instr_rep += param_names[i]
+                        instr_rep += ', '
 
-                # Generate dummy targets if no targets are specified. Assumes
-                # that the gate and register are the same size.
-                if len(target_qubits) == 0:
-                    size = int(np.log2(len(matrix_rep(*params)[0])))
-                    dummy_targets = [i for i in range(size)]
-                    return (Gate(matrix_rep(*params), name=gate_name), *dummy_targets)
+            instr_rep += ':'
+
+            # For now just print the Python source code used to generate if
+            # parametric gate. Fix later.
+            if callable(instruction[2]):
+                instr_rep += '\n{\n'
+                matrix_lines = inspect.getsourcelines(instruction[2])[0]
+                for line in matrix_lines:
+                    instr_rep += line
+                instr_rep += '}\n'
+
+            # Simpler if static gate.
+            else:
+                for row in instruction[2]:
+                    instr_rep += '\n\t'
+                    for element in row:
+                        instr_rep += str(element)
+                        instr_rep += ', '
+                    # Remove trailing whitespace and comma
+                    instr_rep = instr_rep[:-2]
+                    instr_rep += ';'
+                instr_rep += '\n'
+
+        elif instruction[0] == 'IF':
+            instr_rep += "IF("
+            instr_rep += str(instruction[1]) + "):\n\t"
+
+            # Generate THEN branch
+            temp = instruction[2].__repr__()
+            then_prog = ""
+            for char in temp:
+                if char == "\n":
+                    then_prog += char + '\t'
+                else:
+                    then_prog += char
+            instr_rep += "THEN(" + then_prog
+            instr_rep += ") "
+
+            # Generate ELSE branch
+            temp = instruction[3].__repr__()
+            else_prog = ""
+            for char in temp:
+                if char == "\n":
+                    else_prog += char + '\t'
+                else:
+                    else_prog += char
+            instr_rep += "ELSE(" + else_prog
+            instr_rep += ")\n"
+
+        elif instruction[0] == 'WHILE':
+            instr_rep += "WHILE("
+            instr_rep += str(instruction[1]) + "):\n\t"
+
+
+            # Generate DO block
+            temp = instruction[2].__repr__()
+            do_block = ""
+            for char in temp:
+                if char == "\n":
+                    do_block += char + '\t'
+                else:
+                    do_block += char
+            instr_rep += "DO(" + do_block
+            instr_rep +=")\n"
+
+        elif instruction[0] == None:
+            instr_rep += ";\n"
+
+        # (Gate target tuple, params=None, kraus_ops=None)
+        elif isinstance(instruction[0], tuple):
+            gate_target_tuple = instruction[0]
+            # If parameters are specified, include as args to gate name.
+            if instruction[1] != None:
+                instr_rep += gate_target_tuple[0] + '('
+                for param_key in instruction[1]:
+                    instr_rep += str(param_key) + '=' + str(instruction[1][param_key]) + ', '
+                # Remove trailing whitespace and comma
+                instr_rep = instr_rep[:-2] + ') '
+
+            else:
+                instr_rep += gate_target_tuple[0] + ' '
+
+            # Now we print the targets.
+            for i in range(1, len(gate_target_tuple)):
+                if i == len(gate_target_tuple) - 1:
+                    instr_rep += str(gate_target_tuple[i]) + ';'
 
                 else:
-                    return (Gate(matrix_rep(*params), name=gate_name), *target_qubits)
+                    instr_rep += str(gate_target_tuple[i]) + ' '
 
-            self.__instructions.append(gate_def_instruction)
-            return gate_function
+            # Remove trailing whitespace.
+            instr_rep = instr_rep[:-1] + ';\n'
 
         else:
-            gate_def_instruction = ('GATEDEF', str(gate_name), repr(matrix_rep))
+            raise ValueError("Unknown instruction encountered.")
 
-            def gate_function(*target_qubits):
-                if len(target_qubits) == 0:
-                    size = int(np.log2(len(matrix_rep[0])))
-                    dummy_targets = [i for i in range(size)]
-                    return (Gate(matrix_rep, name=gate_name), *dummy_targets)
-
-                else:
-                    return (Gate(matrix_rep, name=gate_name), *target_qubits)
-
-            self.__instructions.append(gate_def_instruction)
-            return gate_function
-
-    def new_gate(self, new_gate_instruction):
-        '''
-        Defines a new gate within the SQUEAK environment and returns a function to
-        the user implementing that gate. The instruction takes the form
-        ('NEWGATE', gate_name, gates), where each gate in the list gates is assumed
-        to act on the same target qubits and are applied in left to right order.
-        '''
-
-        # First we check that new_gate_instruction is well-formed.
-        if not isinstance(new_gate_instruction, tuple):
-            raise TypeError('Argument of new_gate must be a tuple.')
-
-        if not len(new_gate_instruction) == 3:
-            raise TypeError('Instruction has the wrong number of terms.')
-
-        if not new_gate_instruction[0] == 'NEWGATE':
-            raise ValueError("Instruction must begin with 'NEWGATE' keyword.")
-
-        if len(new_gate_instruction[2]) < 1:
-            raise TypeError('NEWGATE must combine at least two gates.')
-
-        if not all(isinstance(gate, type(Gate())) for gate in new_gate_instruction[2]):
-            raise TypeError("Third term of 'NEWGATE' instruction must be list of Gate objects.")
-
-        gate_shape = new_gate_instruction[2][0].shape()
-        for gate in new_gate_instruction[2]:
-            if gate.shape() != gate_shape:
-                raise sqerr.WrongShapeError("All gates in 'NEWGATE' must have same shape.")
-
-        # Now we generate the function implementing the new gate.
-        matrix_reps = [gate.state() for gate in new_gate_instruction[2]]
-        matrix_rep = matrix_reps[0]
-        for i in range(1, len(matrix_reps)):
-            matrix = matrix_reps[i]
-            matrix_rep = np.matmul(matrix, matrix_rep)
-
-        def gate_function(*target_qubits):
-            return (Gate(matrix_rep.tolist(), name=new_gate_instruction[1]), *target_qubits)
-
-        # Finally, we append the instruction to the program, and then return
-        # gate_function to the user.
-        self.__instructions.append(new_gate_instruction)
-        return gate_function
-
-    def instructions(self):
-        '''
-        Helper method for returning a copy of the instructions in list form.
-        '''
-
-        return copy.deepcopy(self.__instructions)
+        return instr_rep
 
     def __len__(self):
         return len(self.__instructions)
 
     def __repr__(self):
-        program_rep = "{\n"
-        for instruction in self.__instructions:
-            program_rep += str(instruction)
-            program_rep += '\n'
+        program_rep = ""
 
-        program_rep += '}'
+        for i in range(len(self.__instructions)):
+            instr_rep = ""
+            instr_rep += self.format_instr(i)
+
+            program_rep += instr_rep
+
+        if len(self) == 0:
+            program_rep = ';'
+
         return program_rep

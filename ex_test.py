@@ -10,9 +10,8 @@ def my_gate(theta):
 
     return rep
 
-rotation = p.gate_def(my_gate, "CLS_ROT")
-params = [np.pi]
-p.add_instr(rotation(params, 0))
+rotation = p.gate_def("CLS_ROT", my_gate)
+p.add_instr(rotation(0), theta=np.pi)
 p.measure(0, 0)
 print(p)
 
