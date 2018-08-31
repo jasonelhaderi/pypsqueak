@@ -5,7 +5,7 @@ with open("README.md", 'r') as fh:
 
 desc = 'A Python package for simulated quantum computing.'
 
-setup(
+setuptools.setup(
     name='pypSQUEAK',
     version='1.0',
     author='Jason K. Elhaderi',
