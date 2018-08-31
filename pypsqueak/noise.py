@@ -5,18 +5,9 @@ import pypsqueak.gates
 import pypsqueak.api as sq
 
 '''
-Quantum operations map a distribution of pure states to another distribution of
-pure states. This can be theoretically represented with the evolution of a density
-matrix via a set of Kraus operators (also called operation elements). Since the
-pypSQUEAK quantum register is implemented as a pure state, we implement quantum
-operations by interpreting the coefficients in each term of (sum E*rho*E^{dagger})
-as the probability that the operation E gets applied to a state. More precisely,
-we take with probability p = <psi|E^{dagger}E|psi> that the transformation
-|psi> -> E/sqrt(p)|psi> takes place.
+Implements functions returning sets of trace-one Kraus operators. Each function
+corresponds to a specific kind of one-qubit noise.
 '''
-
-# The following functions generate the list of Kraus matricies for the correponding
-# quantum operations.
 
 def damping_map(prob=0.1):
     '''

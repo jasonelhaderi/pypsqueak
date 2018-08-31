@@ -191,7 +191,7 @@ class qcVirtualMachineFailure(unittest.TestCase):
         The private self.__swap() method should fail with non-integer input.
         '''
 
-        self.assertRaises(TypeError, self.test_qcvm._qcVirtualMachine__swap, *['peas', []])
+        self.assertRaises(IndexError, self.test_qcvm._qcVirtualMachine__swap, *['peas', []])
 
     def test_negative_reg_loc(self):
         '''

@@ -10,10 +10,10 @@ import pypsqueak.gates as gt
 import pypsqueak.errors as sqerr
 
 '''
-A quantum/classical virtual machine is provided with the qcVirtualMachine class.
+API for pypSQUEAK. A hybrid quantum/classical virtual machine is provided by the
+qcVirtualMachine class for running circuits composed with the Program class.
 The Program class provides a data structure for writing programs to be executed
-by the virtual machine. Since it is intended as the front-end for pypSQUEAK, the
-Program class incorporates some basic linter functionality.
+by the virtual machine.
 '''
 
 # Protected keywords and chars.
@@ -22,12 +22,26 @@ _protected_chars = ['+', '-', '=', '*', '(', ')', ';', ':', '{', '}', '[', ']']
 
 class qcVirtualMachine:
     '''
-    Simulates of the action of a quantum/classical computer with arbitrary memory.
+    Implementation of a hybrid quantum/classical computer. Has both classical and
+    and quantum registers of arbitrary size which are implemented as a list
+    and a Qubit object, respectively. Additionally, there are four instruction
+    registers:
+        - self.__declared_gates ~~~~~ User defined quantum gates
+        - self.__declared_pgates ~~~~ User defined parametric quantum gates
+        - self.__builtin_qgates ~~~~~ Standard set of quantum gates
+        - self.__builtin_cgates ~~~~~ Classical logic gates
+
+    In this implementation, matrix representations (in the form of list, tuple,
+    or numpy ndarray types) are stored in the registers, with Gate objects only
+    being constructed at execution time of a given quantum instruction.
     '''
 
     def __init__(self):
-        # Initalizes with one Qubit in the |0> state in the zeroeth
-        # quantum_reg location, and a 0 in the zeroeth classical_reg location
+        '''
+        Initalizes the machine with a one qubit quantum register in the |0> state
+        and a one bit classical register set to '0'.
+        '''
+
         self.__quantum_reg = Qubit()
         self.__classical_reg = [0]
         self.__q_size = 1
@@ -38,9 +52,24 @@ class qcVirtualMachine:
         self.__builtin_cgates = {**gt.CLASSICAL_OPS}
 
     def __instr(self, gate, *q_reg, kraus_ops=None):
-        # If the list kraus_ops is provided, then the noisy quantum operation that
-        # those Kraus operators defines are applied. Otherwise, the instruction isn't
-        # noisy.
+        '''
+        Applies a quantum gate to the quantum register. If a list of Kraus operators
+        gets handed to the method, then the application is performed as a generalized
+        quantum operation (typically, the set of operators would characterize a kind of
+        noise). Since the qcVirtualMachine quantum register corresponds to a pure state,
+        generalized quantum operations are implemented as follows:
+            1) First, the noiseless quantum gate is applied to the quantum register.
+            2) Next, each of the Kraus operators gets applied to this new quantum
+               register state in order to to generate an ensemble of unnormalized
+               outcome states.
+            2) The norm of each outcome state is computed and interpreted as a probability.
+            3) These probabilities are used as weights to randomly pick one outcome from
+               the ensemble of outcomes. This outcome is then normalized and used
+               as the ultimate quantum register state.
+
+        Note that only trace-preserving Kraus operations are allowed in this
+        implementation.
+        '''
 
         # Check that at least one quantum_reg location is specified for the instruction
         if len(q_reg) == 0:
@@ -62,42 +91,14 @@ class qcVirtualMachine:
             if location < 0:
                 raise ValueError('Quantum register locations must be nonnegative.')
 
-        # Now we check the validity of the Kraus operators
+        # Now we run some more checks on the validity of the Kraus operators
         if kraus_ops != None:
-            # Check that kraus_ops is a list
-            if not isinstance(kraus_ops, list):
-                raise TypeError("The argument kraus_ops must be a nonempty list.")
-
-            # Check that kraus_ops has at least two elements
-            if len(kraus_ops) < 2:
-                raise ValueError("The list kraus_ops must have at least two elements.")
-
-            # Check that each element of kraus_ops is a ndarray
-            if not all(isinstance(op, type(np.array([]))) for op in kraus_ops):
-                raise TypeError("Each operator in kraus_ops must be a numpy array.")
-
-            # Check that each operator in kraus_ops has the correct shape.
-            kraus_shape = kraus_ops[0].shape
-            if kraus_shape[0] != kraus_shape[1]:
-                raise sqerr.WrongShapeError("Kraus operators must be square matricies.")
-
-            for op in kraus_ops:
-                if op.shape != kraus_shape:
-                    raise sqerr.WrongShapeError("Kraus operator shapes must be homogeneous.")
 
             # Check that the size of the Kraus operators agrees with the gate size
+            kraus_shape = kraus_ops[0].shape
             gate_shape = gate.state().shape
             if gate_shape != kraus_shape:
                 raise sqerr.WrongShapeError("Size mismatch between Kraus operators and gate.")
-
-            # Check that kraus_ops satisfy completeness
-            identity = np.identity(kraus_shape[0])
-            sum = np.matmul(np.conjugate(kraus_ops[0].T), kraus_ops[0])
-            for i in range(1, len(kraus_ops)):
-                sum += np.matmul(np.conjugate(kraus_ops[i].T), kraus_ops[i])
-
-            if not np.allclose(sum, identity):
-                raise sqerr.NormalizationError("Kraus operators must satisfy completeness relation.")
 
         # If any of the specified quantum_reg locations have not yet been initialized,
         # initialize them (as well as intermediate reg locs) in the |0> state
@@ -113,8 +114,8 @@ class qcVirtualMachine:
         # Initialize an identity gate for later use (and throw away target qubit)
         I = Gate(gt._I)
 
-        # Swaps operational qubits into order specified by q_reg args by first
-        # generating pairs of swaps to make (using a set to avoid duplicates)
+        # Swap operational qubits into order specified by q_reg args; first we
+        # generate pairs of swaps to make (using a set to avoid duplicates)
         q_flag = 0
         swap_pairs = set()
         for reg_loc in q_reg:
@@ -143,27 +144,28 @@ class qcVirtualMachine:
 
             operator = left_eye.gate_product(gate)
 
-        # If no Kraus operators are specified, evaluation of new register state is simple.
+        # If no Kraus operators are specified, evaluation of new register state is trivial
         if kraus_ops == None:
             new_reg_state = np.dot(operator.state(), self.__quantum_reg.state())
             self.__quantum_reg.change_state(new_reg_state)
 
         else:
-            # First we randomly choose one of the Kraus operators to apply, then we
-            # generate a corresponding gate to hand over to the __instr() method.
+            # We randomly choose one of the Kraus operators to apply, then we
+            # generate a corresponding gate to hand over to the __instr() method
             current_state = np.dot(operator.state(), self.__quantum_reg.state())
             probs = []
             new_state_ensemble = []
 
             # Generate an ensemble of states transformed according to Kraus ops in the
             # form of a list of transformed state vector, and a corresponding
-            # list of weights for each tranformation
+            # list of probability weights for each tranformation
             for op in kraus_ops:
                 # Raise each operator if necessary
                 if self.__q_size > np.log2(op.shape[0]):
                     k = np.kron(left_eye.state(), op)
                 else:
                     k = op
+
                 new_state = k.dot(current_state)
                 new_state_ensemble.append(new_state)
                 new_dual = np.conjugate(new_state)
@@ -180,6 +182,12 @@ class qcVirtualMachine:
             self.__swap(swap_pair[0], swap_pair[1])
 
     def __cinstr(self, name, *target_bits):
+        '''
+        Applies a classical logic gate to the classical register. If any of the
+        targets of the gate are out of the range of the classical register, all
+        necessary new bits get initialized to the state '0' before gate application.
+        '''
+
         # Checks that name is a string and that a valid target is specified
         if len(target_bits) == 0:
             raise ValueError('No target specified for classical instruction.')
@@ -226,10 +234,14 @@ class qcVirtualMachine:
                 self.__classical_reg[c_reg_index_2] = new_bit_values[1]
 
     def __swap(self, i, j):
+        '''
+        Method for swapping the ith and jth qubits in the quantum register.
+        '''
+
         # Swaps higher of i and j by taking the upper index down abs(i - j) times,
         # and then taking the lower index up abs(i - j) - 1 times
         if not isinstance(i, int) or not isinstance(j, int):
-            raise TypeError('Input must be integer-valued.')
+            raise IndexError('Quantum register indicies must be integer-valued.')
 
         if i == j:
             return None
@@ -255,6 +267,10 @@ class qcVirtualMachine:
             self.__elementary_swap(simple_lower, simple_upper)
 
     def __elementary_swap(self, simple_lower, simple_upper):
+        '''
+        Helper method to swap adjacent qubits in the quantum register.
+        '''
+
         # Raise IndexError if swap indicies reference location in the quantum_reg
         # that doesn't exist
         if simple_lower < 0 or simple_lower > (self.__q_size - 1):
@@ -302,9 +318,11 @@ class qcVirtualMachine:
             self.__quantum_reg.change_state(new_swap_state)
 
     def __measure(self, q_reg_loc, c_reg_loc=''):
-        # Performs a measurement on the qubit at q_reg_loc in the quantum_reg,
-        # and optionally stores the result at a specified location in the
-        # classical_reg
+        '''
+        Measures the qubit specified by index q_reg_loc and optionally stores
+        the result in the classical register at the location specified by the
+        address c_reg_loc.
+        '''
 
         # First some sanity checks on the input
         if not isinstance(q_reg_loc, int):
@@ -386,8 +404,9 @@ class qcVirtualMachine:
 
     def __if(self, test_loc, then_branch, else_branch = None):
         '''
-        Uses the contents of the classical register at the test location to
-        evaluate either then_branch, or else_branch (if specified).
+        Uses the contents of the classical register at the address specified by
+        test_loc to conditionally evaluate either of the Program objects
+        then_branch or else_branch (if None, equivalent to an empty statement).
         '''
 
         # First we do sanity checks on the specified test index
@@ -412,8 +431,8 @@ class qcVirtualMachine:
 
     def __while(self, test_loc, body):
         '''
-        Uses the contents of the classical register at the test location to
-        control loop.
+        Executes the Program object body until the content of the classical
+        register at the address specified by test_loc is '0'.
         '''
 
         # First we do sanity checks on the specified test index
@@ -429,8 +448,9 @@ class qcVirtualMachine:
 
     def __reset(self):
         '''
-        Resets the quantum and classical registers.
+        Resets the quantum, classical, and user-declared instruction registers.
         '''
+
         self.__quantum_reg = Qubit()
         self.__classical_reg = [0]
         self.__q_size = 1
@@ -440,11 +460,11 @@ class qcVirtualMachine:
 
     def __elementary_eval(self, line):
         '''
-        Primitive method for handing over a single instruction for execution.
+        Parses a single instruction and calls the appropriate method.
         '''
 
         # If the line is a quantum/classical gate instruction
-        #(gate_target_tuple, params_dict=None, kraus_ops=None),
+        # (gate_target_tuple, params_dict=None, kraus_ops=None),
         # check if the gate name is built in or previously declared, then hand the
         # gate and targets over to self.__instr()
         if isinstance(line[0], tuple):
@@ -484,7 +504,7 @@ class qcVirtualMachine:
             else:
                 self.__declared_gates[gate_name] = matrix_rep
 
-        # If the line is a measurement instruction
+        # If the instruction is a measurement instruction
         # ('MEASURE', q_reg_loc, optional c_reg_loc), hand the
         # contents over to self.__measure()
         elif line[0] == 'MEASURE':
@@ -495,11 +515,13 @@ class qcVirtualMachine:
 
             self.__measure(q_loc, c_loc)
 
+        # While instruction takes the form ('WHILE', test_loc, body)
         elif line[0] == 'WHILE':
             test_loc = line[1]
             body = line[2]
             self.__while(test_loc, body)
 
+        # If instruction takes the form ('IF', c_reg_test_loc, if_branch, else_branch)
         elif line[0] == 'IF':
             if len(line) != 4:
                 raise TypeError("Improper syntax in 'IF' statement.")
@@ -516,7 +538,7 @@ class qcVirtualMachine:
                 else_branch = line[3]
                 self.__if(test_loc, then_branch, else_branch = else_branch)
 
-        # Catches empty instruction
+        # Catches the empty instruction
         elif line[0] == None:
             pass
 
@@ -525,7 +547,7 @@ class qcVirtualMachine:
 
     def __interpreter(self, program):
         '''
-        Sequentially interprets each instruction in the program.
+        Sequentially interprets each instruction in a program.
         '''
 
         if not isinstance(program, type(Program())):
@@ -553,7 +575,8 @@ class qcVirtualMachine:
 
     def execute(self, program):
         '''
-        Returns the contents of the classical register after executing a program.
+        Returns the contents of the classical register as a list after executing
+        a program.
         '''
         self.__interpreter(program)
 
@@ -565,8 +588,8 @@ class qcVirtualMachine:
 
     def quantum_state(self, program):
         '''
-        Returns the state of the quantum register after executing a program.
-        From a physical perspective, this is cheating!
+        Returns the state of the quantum register as a Qubit object after
+        executing a program. From a physical perspective, this is cheating!
         '''
 
         self.__interpreter(program)
@@ -579,8 +602,9 @@ class qcVirtualMachine:
 
 class Program():
     '''
-    Program class provides a data structure for composing and organizing programs
-    to run on qcVirtualMachine.
+    Provides a data structure for composing and organizing programs to run on
+    qcVirtualMachine. Instructions of a program are stored internally in a list
+    of tuples, where each tuple is a token corresponding to an instruction.
     '''
 
     def __init__(self):
@@ -599,7 +623,7 @@ class Program():
 
     def instructions(self):
         '''
-        Helper method for returning a copy of the instructions in list form.
+        Helper method for returning a copy of the instructions.
         '''
 
         if len(self) == 0:
@@ -611,7 +635,12 @@ class Program():
     def add_instr(self, gate_target_tuple, kraus_ops=None, **params):
         '''
         Appends a quantum or classical instruction to self.__instructions. If
-        a list of Kraus matricies is provided, the quantum instruction is noisy.
+        a list of Kraus matricies is provided, the quantum instruction is
+        generalized to a quantum operation. The list kraus_ops must have elements
+        that are numpy ndarrays. If the gate is parametric, corresponding parameter
+        values must be supplied as well. However, this isn't enforced by the
+        Program class. An exception will only get raised at runtime on the
+        qcVirtualMachine.
         '''
 
         # Check that the gate_target_tuple has the correct form.
@@ -653,13 +682,33 @@ class Program():
         # Check that if kraus_ops are given, they are in the form of a list of
         # matrix like objects.
         if not isinstance(kraus_ops, type(None)):
-            if len(kraus_ops) < 2:
-                raise TypeError("Must specify at least two Kraus operators for a quantum op.")
+            # Check that argument kraus_ops has the right form
             if not isinstance(kraus_ops, list):
                 raise TypeError("kraus_ops must be a list of matricies.")
+            if len(kraus_ops) < 2:
+                raise TypeError("Must specify at least two Kraus operators for a quantum op.")
+
+            # Check that each element of kraus_ops is a ndarray
+            if not all(isinstance(op, type(np.array([]))) for op in kraus_ops):
+                raise TypeError("Each operator in kraus_ops must be a numpy array.")
+
+            # Check that each operator in kraus_ops has the correct shape.
+            kraus_shape = kraus_ops[0].shape
+            if kraus_shape[0] != kraus_shape[1]:
+                raise sqerr.WrongShapeError("Kraus operators must be square matricies.")
+
+            # Check that kraus_ops satisfy completeness
+            identity = np.identity(kraus_shape[0])
+            sum = np.matmul(np.conjugate(kraus_ops[0].T), kraus_ops[0])
+            for i in range(1, len(kraus_ops)):
+                sum += np.matmul(np.conjugate(kraus_ops[i].T), kraus_ops[i])
+
+            if not np.allclose(sum, identity):
+                raise sqerr.NormalizationError("Kraus operators must satisfy completeness relation.")
+
             for op in kraus_ops:
-                if not isinstance(op, (list, tuple, type(np.array([0])))):
-                    raise TypeError("kraus_ops must be a list of matricies.")
+                if op.shape != kraus_shape:
+                    raise sqerr.WrongShapeError("All Kraus operators must have same shape.")
                 for row in op:
                     try:
                         len(row)
@@ -684,9 +733,7 @@ class Program():
 
     def measure(self, qubit_loc, classical_loc=None):
         '''
-        Adds to self.__instructions a special instruction to measure the qubit
-        at quantum register location qubit_loc and optionally save it in the
-        classical register at the location classical_loc.
+        Adds a measurement instruction to the program.
         '''
 
         # If the qubit_loc isn't valid, throw an IndexError
@@ -701,6 +748,15 @@ class Program():
         self.__instructions.append(('MEASURE', qubit_loc, classical_loc))
 
     def gate_def(self, name, matrix_rep):
+        '''
+        Adds a 'GATEDEF' instruction to the program. If matrix_rep is not callable,
+        then it has to be a matrix-like list or tuple, or a numpy ndarray. If
+        matrix_rep is callable, then it has to be a function which returns a
+        a matrix-like list or tuple, or a numpy ndarray when called with some
+        number of **kwargs. If matrix_rep is callable but doesn't return a
+        useable matrix representation of a quantum gate, an exception gets thrown
+        at runtime on qcVirtualMachine.
+        '''
 
         # Force name to string.
         name = str(name)
@@ -794,8 +850,8 @@ class Program():
 
     def format_instr(self, n):
         '''
-        Formats the nth instruction in the program (zero-indexed) and returns it
-        as a string.
+        Formats the nth instruction in the program (zero-indexed) according to
+        the SQUEAK language specification and then returns it as a string.
         '''
 
         if not isinstance(n, int) or n < 0:

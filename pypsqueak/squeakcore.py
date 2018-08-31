@@ -3,7 +3,8 @@ import copy
 import pypsqueak.errors as sqerr
 
 '''
-Core components of pypSQUEAK are defined here.
+Core objects of pypSQUEAK are defined here. They are a normalized Qubit datatype,
+and a unitary Gate object.
 '''
 
 class Qubit:
@@ -32,30 +33,19 @@ class Qubit:
                 element + 5
             except:
                 raise TypeError('Elements of input state must be numeric.')
-        # elif any(isinstance(element, list) for element in some_vector):
-        #     raise TypeError('Elements of input state must be numeric.')
-        #
-        # elif any(isinstance(element, tuple) for element in some_vector):
-        #     raise TypeError('Elements of input state must be numeric.')
-        #
-        # elif any(isinstance(element, type(np.array([0]))) for element in some_vector):
-        #     raise TypeError('Elements of input state must be numeric.')
-        #
-        # elif any(isinstance(element, dict) for element in some_vector):
-        #     raise TypeError('Elements of input state must be numeric.')
-        #
-        # elif any(isinstance(element, str) for element in some_vector):
-        #     raise TypeError('Elements of input state must be numeric.')
 
         # Checks that the some_vector isn't null, or the null vector.
         if all(element == 0 for element in some_vector):
             raise sqerr.NullVectorError('State cannot be the null vector.')
 
         # Checks that some_vector has length greater than 1 which is a power of 2.
-        if not is_power_2(len(some_vector)) or len(some_vector) == 1:
+        if not sqerr.is_power_2(len(some_vector)) or len(some_vector) == 1:
             raise sqerr.WrongShapeError('Input state must have a length > 1 which is a power of 2.')
 
     def change_state(self, new_state):
+        '''
+        Changes the state of the qubit to the vector specified by new_state.
+        '''
         # Checks that input is valid.
         self.__validate_state(new_state)
 
@@ -66,14 +56,14 @@ class Qubit:
 
     def state(self):
         '''
-        Returns a copy of self.__state for use in operations.
+        Returns a copy of self.__state for external use.
         '''
 
         return np.copy(self.__state)
 
     def computational_decomp(self):
         '''
-        Returns a copy of self.__computational_decomp for use in operations.
+        Returns a copy of self.__computational_decomp for external use.
         '''
 
         return copy.deepcopy(self.__computational_decomp)
@@ -120,6 +110,14 @@ class Qubit:
         return state_rep
 
     def qubit_product(self, *arg):
+        '''
+        Method for returning the Kronecker product of a qubit with one or more
+        other qubits. When multiple arguments are specified, the product is
+        computed sequentially from left to right.
+
+        Note that this method does NOT have side-effects; it simply returns the
+        product as a new Qubit object.
+        '''
         if len(arg) == 0:
             raise TypeError('Must specify at least one argument.')
         new_qubits = self.__state
@@ -163,7 +161,7 @@ class Gate:
 
         # Checks that the input is a square matrix
         self.__shape = (len(some_matrix), len(some_matrix[0]))
-        if not is_power_2(self.__shape[0]) or self.__shape[0] == 1:
+        if not sqerr.is_power_2(self.__shape[0]) or self.__shape[0] == 1:
             raise sqerr.WrongShapeError('Gate must be nXn with n > 1 a power of 2.')
 
         for row in some_matrix:
@@ -190,7 +188,7 @@ class Gate:
 
     def state(self):
         '''
-        Returns a copy of self.__state for use in operations.
+        Returns a copy of self.__state for external use.
         '''
         return np.copy(self.__state)
 
@@ -201,7 +199,14 @@ class Gate:
         return self.__name
 
     def gate_product(self, *arg):
-        # Returns the a Gate() that is the Kronecker product of self and *args
+        '''
+        Method for returning the Kronecker product of a gate with one or more
+        other gates. When multiple arguments are specified, the product is
+        computed sequentially from left to right.
+
+        Note that this method does NOT have side-effects; it simply returns the
+        product as a new Gate object.
+        '''
         new_gate = self.__state
         if len(arg) == 0:
             return Gate(new_gate)
@@ -230,18 +235,3 @@ class Gate:
 
         else:
             return str(self.__state)
-
-# Helper function for testing validity of Qubit/Gate sizes
-def is_power_2(n):
-    if not n == int(n):
-        return False
-
-    n = int(n)
-    if n == 1:
-        return True
-
-    elif n >= 2:
-        return is_power_2(n/2.0)
-
-    else:
-        return False

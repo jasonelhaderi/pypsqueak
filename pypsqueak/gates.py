@@ -4,43 +4,14 @@ import cmath
 from pypsqueak.squeakcore import Gate
 
 '''
-Functions implementing standard quantum gates on one or more target_qubits, and
-classical unary and binary gates. The quantum gates return a tuple consisting of
-(Gate object, target_qubits). The classical unary gates take an input_bit and return
-an output_bit. The binary gates take input_bit_1 and input_bit_2, and return an
-output_bit. COPY and EXCHANGE classical gates are also implemented.
+Implementations of standard quantum/classical gates on one or more target (qu)bits.
+The quantum gate functions return a tuple consisting of the gate's name followed
+by any target qubits. Matrix representations of each quantum gate are also provided. For
+parametric gates, these representations are functions with a matrix-like return
+type. Classical gates have representations as function which return one or more
+bit values. The dictionaries STD_GATES and CLASSICAL_OPS map the gate names to the
+corresponding representations.
 '''
-
-def custom_gate(matrix_rep, gate_name="Custom Gate", *target_qubits):
-    '''
-    A convenience function for designing custom Gate objects by hand.
-    '''
-
-    if len(target_qubits) == 0:
-        size = int(np.log2(len(matrix_rep[0])))
-
-        # Fake target qubits are necessary for the back end operation
-        # when no targets are specified.
-        dummy_targets = [i for i in range(size)]
-        return (Gate(matrix_rep, name=gate_name), *dummy_targets)
-
-    else:
-        return (Gate(matrix_rep, name=gate_name), *target_qubits)
-
-def NEWGATE(*gate_target_tuples, gate_name="NEW GATE"):
-    '''
-    Defines a new named gate within the SQUEAK environment using one or more tuples
-    of the form (Gate(), *target_qubits), where any provided target_qubits get thrown
-    away. The assumption is that each of the gates in the list will act on identical
-    targets. Throws an error if the gate shapes don't match. Returns a two-item
-    list: the first item is the SQUEAK Program instruction (applying gates in
-    left to right order), and the second item is a function implementing the gate
-    in the same way that standard gates are implemented.
-    '''
-
-    gates = [gate_target_tuple[0] for gate_target_tuple in gate_target_tuples]
-
-    return ('NEWGATE', gate_name, gates)
 
 # Pauli Gates
 
@@ -50,25 +21,11 @@ def X(target_qubit):
 _X = [[0, 1],
       [1, 0]]
 
-# def _X(target_qubit):
-#
-#     matrix_rep = [[0, 1],
-#                   [1, 0]]
-#
-#     return (Gate(matrix_rep, name='X'), target_qubit)
-
 def Y(target_qubit):
     return ('Y', target_qubit)
 
 _Y = [[0, -1j],
       [1j, 0]]
-
-# def _Y(target_qubit):
-#
-#     matrix_rep = [[0, -1j],
-#                   [1j, 0]]
-#
-#     return (Gate(matrix_rep, name='Y'), target_qubit)
 
 def Z(target_qubit):
     return ('Z', target_qubit)
@@ -76,22 +33,11 @@ def Z(target_qubit):
 _Z = [[1, 0],
       [0, -1]]
 
-# def _Z(target_qubit):
-#
-#     matrix_rep = [[1, 0],
-#                   [0, -1]]
-#
-#     return (Gate(matrix_rep, name='Z'), target_qubit)
-
 def I(target_qubit):
     return ('I', target_qubit)
 
 _I = [[1, 0],
       [0, 1]]
-
-# def _I(target_qubit):
-#
-#     return (Gate(name='I'), target_qubit)
 
 # Hadamard Gate
 
@@ -99,12 +45,6 @@ def H(target_qubit):
     return ('H', target_qubit)
 
 _H = [[1/np.sqrt(2), ((-1)**i) * 1/np.sqrt(2)] for i in range(2)]
-
-# def _H(target_qubit):
-#
-#     matrix_rep = [[1/np.sqrt(2), ((-1)**i) * 1/np.sqrt(2)] for i in range(2)]
-#
-#     return (Gate(matrix_rep, name='H'), target_qubit)
 
 # Phase Gates
 
@@ -116,38 +56,17 @@ def _PHASE(theta=0):
                   [0, np.exp(1j * theta)]]
     return matrix_rep
 
-# def _PHASE(target_qubit, theta=0):
-#
-#     matrix_rep = [[1, 0],
-#                   [0, np.exp(1j * theta)]]
-#
-#     return (Gate(matrix_rep, name='PHASE '+str(theta)), target_qubit)
-
 def S(target_qubit):
     return ('S', target_qubit)
 
 _S = [[1, 0],
       [0, 1j]]
 
-# def _S(target_qubit):
-#
-#     matrix_rep = [[1, 0],
-#                   [0, 1j]]
-#
-#     return (Gate(matrix_rep, name='S'), target_qubit)
-
 def T(target_qubit):
     return ('T', target_qubit)
 
 _T = [[1, 0],
       [0, np.exp(1j * np.pi/4)]]
-
-# def _T(target_qubit):
-#
-#     matrix_rep = [[1, 0],
-#                   [0, np.exp(1j * np.pi/4)]]
-#
-#     return (Gate(matrix_rep, name='T'), target_qubit)
 
 # Rotation Gates
 
@@ -159,13 +78,6 @@ def _RX(theta=0):
                       [-1j*np.sin(theta/2.0), np.cos(theta/2.0)]]
     return matrix_rep
 
-# def _RX(target_qubit, theta=0):
-#
-#     matrix_rep = [[np.cos(theta/2.0), -1j*np.sin(theta/2.0)],
-#                   [-1j*np.sin(theta/2.0), np.cos(theta/2.0)]]
-#
-#     return (Gate(matrix_rep, name='RX '+str(theta)), target_qubit)
-
 def RY(target_qubit):
     return ('RY', target_qubit)
 
@@ -174,13 +86,6 @@ def _RY(theta=0):
                   [np.sin(theta/2.0), np.cos(theta/2.0)]]
     return matrix_rep
 
-# def _RY(target_qubit, theta=0):
-#
-#     matrix_rep = [[np.cos(theta/2.0), -np.sin(theta/2.0)],
-#                   [np.sin(theta/2.0), np.cos(theta/2.0)]]
-#
-#     return (Gate(matrix_rep, name='RY '+str(theta)), target_qubit)
-
 def RZ(target_qubit):
     return ('RZ', target_qubit)
 
@@ -188,13 +93,6 @@ def _RZ(theta=0):
     matrix_rep = [[np.exp(-1j * theta/2.0), 0],
                   [0, np.exp(1j * theta/2.0)]]
     return matrix_rep
-
-# def _RZ(target_qubit, theta=0):
-#
-#     matrix_rep = [[np.exp(-1j * theta/2.0), 0],
-#                   [0, np.exp(1j * theta/2.0)]]
-#
-#     return (Gate(matrix_rep, name='RZ '+str(theta)), target_qubit)
 
 # Two Qubit Gates
 
@@ -206,15 +104,6 @@ _SWAP = [[1, 0, 0, 0],
          [0, 1, 0, 0],
          [0, 0, 0, 1]]
 
-# def _SWAP(target_qubit_i, target_qubit_j):
-#
-#     matrix_rep = [[1, 0, 0, 0],
-#                   [0, 0, 1, 0],
-#                   [0, 1, 0, 0],
-#                   [0, 0, 0, 1]]
-#
-#     return (Gate(matrix_rep, name='SWAP'), target_qubit_i, target_qubit_j)
-
 def CNOT(control_qubit, target_qubit):
     return ('CNOT', control_qubit, target_qubit)
 
@@ -222,15 +111,6 @@ _CNOT = [[1, 0, 0, 0],
          [0, 1, 0, 0],
          [0, 0, 0, 1],
          [0, 0, 1, 0]]
-
-# def _CNOT(control_qubit, target_qubit):
-#
-#     matrix_rep = [[1, 0, 0, 0],
-#                   [0, 1, 0, 0],
-#                   [0, 0, 0, 1],
-#                   [0, 0, 1, 0]]
-#
-#     return (Gate(matrix_rep, name='CNOT'), control_qubit, target_qubit)
 
 # Classical gates (prepended with '_' are for the backend in qcVirtualMachine)
 
@@ -282,7 +162,6 @@ def EXCHANGE(c_reg_loc_1, c_reg_loc_2):
 def _EXCHANGE(input_bit_1, input_bit_2):
     return input_bit_2, input_bit_1
 
-# These dicts get imported by qcVirtualMachine as the standard gate registers.
 CLASSICAL_OPS = {'NOT': _NOT,
                  'TRUE': _TRUE,
                  'FALSE': _FALSE,
