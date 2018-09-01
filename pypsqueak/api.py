@@ -928,7 +928,7 @@ class Program():
                     then_prog += char + '\t'
                 else:
                     then_prog += char
-            instr_rep += "THEN(\n" + then_prog
+            instr_rep += "THEN(\n\t" + then_prog
             instr_rep += ") "
 
             # Generate ELSE branch
@@ -941,8 +941,8 @@ class Program():
                     else:
                         else_prog += char
             else:
-                else_prog = ";\n"
-            instr_rep += "ELSE(\n" + else_prog
+                else_prog = ";\n\t"
+            instr_rep += "ELSE(\n\t" + else_prog
             instr_rep += ")\n"
 
         elif instruction[0] == 'WHILE':
@@ -958,7 +958,7 @@ class Program():
                     do_block += char + '\t'
                 else:
                     do_block += char
-            instr_rep += "DO(\n" + do_block
+            instr_rep += "DO(\n\t" + do_block
             instr_rep +=")\n"
 
         elif instruction[0] == None:
