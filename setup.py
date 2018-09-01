@@ -7,7 +7,7 @@ desc = 'A Python package for simulated quantum computing.'
 
 setuptools.setup(
     name='pypSQUEAK',
-    version='1.0',
+    version='1.0.1',
     author='Jason K. Elhaderi',
     author_email='jasonelhaderi@gmail.com',
     description=desc,

@@ -896,7 +896,7 @@ class Program():
             instr_rep += ':'
 
             # For now just print the Python source code used to generate if
-            # parametric gate. Fix later.
+            # parametric gate.
             if callable(instruction[2]):
                 instr_rep += '\n{\n'
                 matrix_lines = inspect.getsourcelines(instruction[2])[0]
@@ -928,18 +928,21 @@ class Program():
                     then_prog += char + '\t'
                 else:
                     then_prog += char
-            instr_rep += "THEN(" + then_prog
+            instr_rep += "THEN(\n" + then_prog
             instr_rep += ") "
 
             # Generate ELSE branch
-            temp = instruction[3].__repr__()
-            else_prog = ""
-            for char in temp:
-                if char == "\n":
-                    else_prog += char + '\t'
-                else:
-                    else_prog += char
-            instr_rep += "ELSE(" + else_prog
+            if instruction[3] != None:
+                temp = instruction[3].__repr__()
+                else_prog = ""
+                for char in temp:
+                    if char == "\n":
+                        else_prog += char + '\t'
+                    else:
+                        else_prog += char
+            else:
+                else_prog += ';\n'
+            instr_rep += "ELSE(\n" + else_prog
             instr_rep += ")\n"
 
         elif instruction[0] == 'WHILE':
@@ -955,7 +958,7 @@ class Program():
                     do_block += char + '\t'
                 else:
                     do_block += char
-            instr_rep += "DO(" + do_block
+            instr_rep += "DO(\n" + do_block
             instr_rep +=")\n"
 
         elif instruction[0] == None:
