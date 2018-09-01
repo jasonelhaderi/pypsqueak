@@ -941,7 +941,7 @@ class Program():
                     else:
                         else_prog += char
             else:
-                else_prog += ';\n'
+                else_prog = ";\n"
             instr_rep += "ELSE(\n" + else_prog
             instr_rep += ")\n"
 
