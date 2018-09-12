@@ -1,15 +1,46 @@
+'''
+Provides core ``Qubit`` and ``Gate`` objects.
+'''
+
 import numpy as np
 import copy
 import pypsqueak.errors as sqerr
 
-'''
-Core objects of pypSQUEAK are defined here. They are a normalized Qubit datatype,
-and a unitary Gate object.
-'''
-
 class Qubit:
     '''
-    Creates a normalized Qubit object out of some_vector.
+    A ``Qubit`` is a variable-sized (length can be powers of two), normalized,
+    complex vector. Its state (returned by ``state()``) is a one-dimensional
+    numpy array consisting of the computational basis representation of the quantum
+    state. By default it is initialized in the |0> state, but this can be
+    overridded if a ``Qubit`` is instantiated with some other numeric vector
+    as argument (the resulting ``Qubit`` will use the normalized version of
+    that vector).
+
+    The state a ``Qubit`` can be changed with a call to ``change_state()``.
+    Additionally, a dictionary with computational basis state labels as keys
+    and corresponding components as values gets returned by
+    ``computational_decomp()``.
+
+    Note that the length of a ``Qubit`` is the number of qubits that the state
+    vector corresponds to (``log2(len(state_vector))``).
+
+    Examples
+    --------
+    Here we initialize a ``Qubit`` in the |0> state, and then change it to the
+    |11> state.
+
+    >>> q = Qubit()
+    >>> p = Qubit([0, 1, 0, 0])
+    >>> q
+    [1. 0.]
+    >>> print(q)
+    (1.00e+00)|0> + (0.00e+00)|0>
+    >>> print(p)
+    (0.00e+00)|00> + (1.00e+00)|01> + (0.00e+00)|10> +(0.00e+00)|11>
+    >>> q.change_state([0, 0, 0, 1])
+    >>> print(q)
+    (0.00e+00)|00> + (0.00e+00)|01> + (0.00e+00)|10> + (1.00e+00)|11>
+
     '''
 
     def __init__(self, init_state = [1, 0]):
@@ -39,12 +70,25 @@ class Qubit:
             raise sqerr.NullVectorError('State cannot be the null vector.')
 
         # Checks that some_vector has length greater than 1 which is a power of 2.
-        if not sqerr.is_power_2(len(some_vector)) or len(some_vector) == 1:
+        if not sqerr._is_power_2(len(some_vector)) or len(some_vector) == 1:
             raise sqerr.WrongShapeError('Input state must have a length > 1 which is a power of 2.')
 
     def change_state(self, new_state):
         '''
-        Changes the state of the qubit to the vector specified by new_state.
+        Changes the state of the Qubit to the normalized vector corresponding to
+        the argument.
+
+        Parameters
+        ----------
+        new_state : list-like
+            The vector representation of the new state in the computational
+            basis. Must have a length which is a power of two.
+
+        Returns
+        -------
+        None
+            The Qubit instance on which ``change_state()`` is called is
+            altered.
         '''
         # Checks that input is valid.
         self.__validate_state(new_state)
@@ -56,14 +100,25 @@ class Qubit:
 
     def state(self):
         '''
-        Returns a copy of self.__state for external use.
+        The state of the Qubit as an ndarray.
+
+        Returns
+        -------
+        numpy.ndarray
+            A copy of the Qubit's state.
         '''
 
         return np.copy(self.__state)
 
     def computational_decomp(self):
         '''
-        Returns a copy of self.__computational_decomp for external use.
+        A representation of the Qubit's state via a dict. Computational basis
+        labels are the keys and the components of the Qubit are the values.
+
+        Returns
+        -------
+        dict
+            A computational basis representation of the Qubit.
         '''
 
         return copy.deepcopy(self.__computational_decomp)
@@ -111,12 +166,40 @@ class Qubit:
 
     def qubit_product(self, *arg):
         '''
-        Method for returning the Kronecker product of a qubit with one or more
-        other qubits. When multiple arguments are specified, the product is
-        computed sequentially from left to right.
+        Returns the Kronecker product of a ``Qubit`` with one or more other
+        ``Qubit`` objects.
 
-        Note that this method does NOT have side-effects; it simply returns the
-        product as a new Qubit object.
+        When multiple arguments are specified, the product is computed
+        sequentially from the leftmost argument to the rightmost.
+
+        Parameters
+        ----------
+        *arg : pypsqueak.squeakcore.Qubit
+            One or more ``Qubit`` objects. Raises an exception if called with
+            no arguments.
+
+        Returns
+        -------
+        pypsqueak.squeakcore.Qubit
+            The left to right Kronecker product.
+
+        Examples
+        --------
+        >>> q1 = Qubit()
+        >>> q2 = Qubit([0, 1])
+        >>> q3 = Qubit([1, 0, 0, 0])
+        >>> q1_q2 = q1.qubit_product(q2)
+        >>> q1_q2
+        [1. 0.]
+        >>> q1_q2.state()
+        array([0., 1., 0., 0.])
+        >>> q2_q1 = q2.qubit_product(q1)
+        >>> q2_q1
+        [0. 0. 1. 0.]
+        >>> q1_q2_q3 = q1.qubit_product(q2, q3)
+        >>> q1_q2_q3
+        [0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
+
         '''
         if len(arg) == 0:
             raise TypeError('Must specify at least one argument.')
@@ -137,7 +220,44 @@ class Qubit:
 
 class Gate:
     '''
-    Creates a unitary gate out of some_matrix.
+    A ``Gate`` is a variable-sized (shape is a tuple of powers of two), unitary
+    matrix. Its state (returned by ``state()``) is a two-dimensional numpy array
+    consisting of the computational basis representation of the quantum
+    gate. By default it is initialized to the one qubit identity gate, but this
+    can be overridded if the ``Gate`` is instantiated with some other numeric matrix
+    as argument. If the matrix argument is not unitary, the ``Gate`` will fail
+    to initialize. Additionally, the gate can be given a name via the
+    the corresponding kwarg. If not provided, defaults to ``None``.
+
+    Note that ``len(some_gate)`` returns the number of qubits that ``some_gate``
+    acts on (``log2(some_gate.shape()[0])``)
+
+    Examples
+    --------
+    >>> g1 = Gate()
+    >>> g1
+    [[1 0]
+     [0 1]]
+    >>> g1.state()
+    array([[1, 0],
+           [0, 1]])
+    >>> g2 = Gate([(0, 1), (1, 0)])
+    >>> g2
+    [[0 1]
+     [1 0]]
+    >>> g3 = Gate(np.eye(4))
+    >>> g3
+    [[1. 0. 0. 0.]
+     [0. 1. 0. 0.]
+     [0. 0. 1. 0.]
+     [0. 0. 0. 1.]]
+    >>> (len(g2), len(g3))
+    (1, 2)
+    >>> not_unitary = Gate([(0, 0), (1, 1)])
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    pypsqueak.errors.NonUnitaryInputError: Gate must be unitary.
+
     '''
 
     def __init__(self, some_matrix = [(1, 0), (0, 1)], name = None):
@@ -161,7 +281,7 @@ class Gate:
 
         # Checks that the input is a square matrix
         self.__shape = (len(some_matrix), len(some_matrix[0]))
-        if not sqerr.is_power_2(self.__shape[0]) or self.__shape[0] == 1:
+        if not sqerr._is_power_2(self.__shape[0]) or self.__shape[0] == 1:
             raise sqerr.WrongShapeError('Gate must be nXn with n > 1 a power of 2.')
 
         for row in some_matrix:
@@ -188,14 +308,35 @@ class Gate:
 
     def state(self):
         '''
-        Returns a copy of self.__state for external use.
+        The state of the Gate as an ndarray.
+
+        Returns
+        -------
+        numpy.ndarray
+            A copy of the Gate's state.
         '''
         return np.copy(self.__state)
 
     def shape(self):
+        '''
+        Tuple of the Gate's shape. Equivalent to
+        ``(2**len(some_gate),) * 2``.
+
+        Returns
+        -------
+        tuple
+            A copy of the Gate's shape.
+        '''
+
         return copy.deepcopy(self.__shape)
 
     def name(self):
+        '''
+        Returns
+        -------
+        arbitrary
+            The name of the ``Gate``.
+        '''
         return self.__name
 
     def gate_product(self, *arg):
@@ -206,7 +347,42 @@ class Gate:
 
         Note that this method does NOT have side-effects; it simply returns the
         product as a new Gate object.
+
+        Returns the Kronecker product of a ``Gate`` with one or more other ``Gate``s.
+
+        When multiple arguments are specified, the product is computed
+        sequentially from the leftmost argument to the rightmost.
+
+        Parameters
+        ----------
+        \*arg : pypsqueak.squeakcore.Gate
+            One or more ``Gate`` objects. Raises an exception if called with
+            no arguments.
+
+        Returns
+        -------
+        pypsqueak.squeakcore.Gate
+            The left to right Kronecker product.
+
+        Examples
+        --------
+        >>> g1 = Gate()
+        >>> g2 = Gate([[0, 1], [1, 0]])
+        >>> g1_g2 = g1.gate_product(g2)
+        >>> g1_g2
+        [[0 1 0 0]
+         [1 0 0 0]
+         [0 0 0 1]
+         [0 0 1 0]]
+        >>> g2_g1 = g2.gate_product(g1)
+        >>> g2_g1
+        [[0 0 1 0]
+         [0 0 0 1]
+         [1 0 0 0]
+         [0 1 0 0]]
+
         '''
+
         new_gate = self.__state
         if len(arg) == 0:
             return Gate(new_gate)
