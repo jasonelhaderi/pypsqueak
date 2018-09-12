@@ -9,7 +9,7 @@ Features of pypSQUEAK include:
 * Program control flow with conditionals and loops.
 * Modeling of noisy quantum channels.
 
-(Include link to documentation when it exists.)
+For more information, consult the [documentation](https://pypsqueak.readthedocs.io/en/latest/index.html).
 
 ## Installation
 Installation is done via `pip`:
