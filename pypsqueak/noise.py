@@ -36,7 +36,6 @@ import numpy as np
 
 from pypsqueak.squeakcore import Gate
 import pypsqueak.gates
-import pypsqueak.api as sq
 
 def damping_map(prob=0.1):
     '''
@@ -80,7 +79,7 @@ def depolarization_map(prob=0.1):
     '''
 
     dep_i = np.sqrt(1 - 3.0*prob/4) * np.array([[1, 0],
-                                                 [0, 1]])
+                                                [0, 1]])
     dep_x = np.sqrt(1.0*prob/4) * np.array([[0, 1],
                                             [1, 0]])
     dep_y = np.sqrt(1.0*prob/4) * np.array([[0, -1j],
@@ -108,7 +107,7 @@ def phase_map(prob=0.1):
     '''
 
     phase_1 = np.array([[1, 0],
-                       [0, np.sqrt(1 - prob)]])
+                        [0, np.sqrt(1 - prob)]])
     phase_2 = np.array([[0, 0],
                       [0, np.sqrt(prob)]])
 
@@ -131,10 +130,10 @@ def p_flip_map(prob=0.1):
         corresponding quantum operation.
     '''
 
-    static = np.sqrt(prob) * np.array([[1, 0],
+    static = np.sqrt(1 - prob) * np.array([[1, 0],
                                        [0, 1]])
-    flip = np.sqrt(1 - prob) * np.array([[1, 0],
-                                         [0, -1]])
+    flip = np.sqrt(prob) * np.array([[1, 0],
+                                     [0, -1]])
 
     return [static, flip]
 
@@ -155,10 +154,10 @@ def b_flip_map(prob=0.1):
         corresponding quantum operation.
     '''
 
-    static = np.sqrt(prob) * np.array([[1, 0],
-                                       [0, 1]])
-    flip = np.sqrt(1 - prob) * np.array([[0, 1],
-                                         [1, 0]])
+    static = np.sqrt(1 - prob) * np.array([[1, 0],
+                                           [0, 1]])
+    flip = np.sqrt(prob) * np.array([[0, 1],
+                                     [1, 0]])
 
     return [static, flip]
 
@@ -179,9 +178,9 @@ def bp_flip_map(prob=0.1):
         corresponding quantum operation.
     '''
 
-    static = np.sqrt(prob) * np.array([[1, 0],
-                                       [0, 1]])
-    flip = np.sqrt(1 - prob) * np.array([[0, -1j],
-                                         [1j, 0]])
+    static = np.sqrt(1 - prob) * np.array([[1, 0],
+                                           [0, 1]])
+    flip = np.sqrt(prob) * np.array([[0, -1j],
+                                     [1j, 0]])
 
     return [static, flip]

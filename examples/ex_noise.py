@@ -16,7 +16,7 @@ p.measure(2, 0)
 
 zeros = 0
 ones = 0
-n_runs = 100
+n_runs = 1000
 for i in range(n_runs):
     if qcvm.execute(p)[0] == 0:
         zeros += 1

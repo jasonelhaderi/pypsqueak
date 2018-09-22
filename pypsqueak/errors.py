@@ -38,6 +38,18 @@ class UnknownInstruction(NotImplementedError):
     '''
     pass
 
+class IllegalRegisterReference(NameError):
+    '''
+    Raised when any kind of operation is attempted on a killed qReg.
+    '''
+    pass
+
+class IllegalCopyAttempt(NotImplementedError):
+    '''
+    Raised when a qReg is copied.
+    '''
+    pass
+
 def _is_power_2(n):
     # Helper function for testing validity of Qubit/Gate sizes
 

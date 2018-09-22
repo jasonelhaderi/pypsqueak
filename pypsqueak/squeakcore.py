@@ -155,12 +155,17 @@ class Qubit:
         first_term_flag = 0
         state_rep = ""
         for state_label in self.__computational_decomp:
-            if first_term_flag == 0:
-                state_rep += "({0:.2e})|{1}>".format(self.__computational_decomp[state_label], state_label)
-                first_term_flag = 1
+            # This if statement supresses terms with zero magnitude.
+            if not self.__computational_decomp[state_label] == 0\
+                and not self.__computational_decomp[state_label] == 0 + 0j:
+                if first_term_flag == 0:
+                    state_rep += "({0:.2e})|{1}>".format(self.__computational_decomp[state_label], state_label)
+                    first_term_flag = 1
 
-            elif first_term_flag == 1:
-                state_rep += " + ({:.2e})|{}>".format(self.__computational_decomp[state_label], state_label)
+                elif first_term_flag == 1:
+                    state_rep += " + ({:.2e})|{}>".format(self.__computational_decomp[state_label], state_label)
+            else:
+                pass
 
         return state_rep
 
