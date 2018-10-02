@@ -1,101 +1,96 @@
-import context
+import context  # Remove this import if running with pip installed version.
 
-import pypsqueak.api as sq
+from pypsqueak.api import qReg, qOracle, qOp
 from pypsqueak.gates import X, Z, H
 import numpy as np
 
 # Number of bits in the input bitstring.
-n = 5
+n = 4
 
 oracle_type, oracle_value = np.random.randint(2), np.random.randint(2)
 # Construct a list of all output values for the oracle.
 if oracle_type == 0:
     print("Using a constant oracle with {}-bit input.".format(n))
-    value = np.random.randint(2)
-    oracle_list = [value for i in range(2**n)]
+    def make_black_box():
+        value = np.random.randint(2)
+        return [value for i in range(2**n)]
 
 else:
     print("Using a balanced oracle with {}-bit input.".format(n))
-    oracle_list = []
-    n_zeros = (2**n)/2
-    n_ones = n_zeros
+    def make_black_box():
+        oracle_list = []
+        n_zeros = (2**n)/2
+        n_ones = n_zeros
 
-    # Append either 0 or 1 randomly subject to the constraint that the total
-    # number of zeros and ones be equal.
-    for i in range(2**n):
-        if n_zeros != 0 and n_ones != 0:
-            new_query = np.random.randint(2)
-            oracle_list.append(new_query)
-            if new_query == 1:
+        # Append either 0 or 1 randomly subject to the constraint that the total
+        # number of zeros and ones be equal.
+        for i in range(2**n):
+            if n_zeros != 0 and n_ones != 0:
+                new_query = np.random.randint(2)
+                oracle_list.append(new_query)
+                if new_query == 1:
+                    n_ones -= 1
+                if new_query == 0:
+                    n_zeros -= 1
+
+            elif n_zeros == 0 and n_ones != 0:
+                oracle_list.append(1)
                 n_ones -= 1
-            if new_query == 0:
+
+            elif n_ones == 0 and n_zeros != 0:
+                oracle_list.append(0)
                 n_zeros -= 1
 
-        elif n_zeros == 0 and n_ones != 0:
-            oracle_list.append(1)
-            n_ones -= 1
+            else:
+                raise ValueError("The oracle has failed!")
 
-        elif n_ones == 0 and n_zeros != 0:
-            oracle_list.append(0)
-            n_zeros -= 1
+        return oracle_list
 
-        else:
-            raise ValueError("The oracle has failed!")
+# func = lambda i: oracle_list[i]
+# # Make the black box.
+# black_box = qOracle(func, n)
 
-# Use the oracle to construct our black box out of the identity matrix.
-black_box = np.identity(2**(n+1))
+# Make a function implementing the circuit.
+def deutschJozsa(input_register, black_box):
+    # Take |input_reg> to |input_reg>|1>
+    input_register *= qReg()
+    X.on(input_register, 0)
 
-for i in range(len(oracle_list)):
-    if oracle_list[i] == 0:
-        pass
-    else:
-        # Swaps |0...> with |1...>
-        index_loc = i + 2**n
-        if index_loc < 2**(n+1):
-            # set original diags to zero
-            black_box[i][i] = 0
-            black_box[index_loc][index_loc] = 0
-            # set off diag elements to one
-            black_box[index_loc][i] = 1
-            black_box[i][index_loc] = 1
-        else:
-            pass
+    # Prep qubits 1 to n in the Hadamard state.
+    for i in range(1, n+1):
+        H.on(input_register, i)
 
-dj_program = sq.Program()
-all_qubits = [i for i in range(n+1)]
-black_box_gate = dj_program.gate_def("ORACLE", black_box)
+    # Flip the answer qubit and apply H.
+    H.on(input_register, 0)
 
-# Prep qubits 0 to n - 1 in the Hadamard state.
-for i in range(n):
-    dj_program.add_instr(H(i))
+    # Query the oracle.
+    black_box.on(input_register, *list(range(n+1)))
 
-# Flip the answer qubit and apply H.
-dj_program.add_instr(X(n))
-dj_program.add_instr(H(n))
+    # Apply H to the qubits 1 through n.
+    for i in range(1, n+1):
+        H.on(input_register, i)
 
-# Query the oracle.
-dj_program.add_instr(black_box_gate(*all_qubits))
+    # Measure the first n qubits. If the any of the results
+    # are nonzero, the oracle is balanced. Else, it is constant.
+    results = []
+    for i in range(1, n+1):
+        results.append(input_register.measure(i))
 
-# Apply H to the first n qubits.
-for i in range(n):
-    dj_program.add_instr(H(i))
-
-# Measure the first n qubits into the classical register. If the any of the results
-# are nonzero, the oracle is balanced. Else, it is constant.
-for i in range(n):
-    dj_program.measure(i, i)
-
-qcvm = sq.qcVirtualMachine()
+    return results
 
 # Let's try this out a whole bunch of times!
 n_tries = 10
 zeros = 0
 ones = 0
+
 print("Conducting {} trials...".format(n_tries))
 
 for i in range(n_tries):
-    result = qcvm.execute(dj_program)
-    if any(result):
+    input_register = qReg(n)
+    oracle_list = make_black_box()
+    black_box = qOracle(lambda i: oracle_list[i], n)
+    results = deutschJozsa(input_register, black_box)
+    if any(results):
         ones += 1
     else:
         zeros += 1

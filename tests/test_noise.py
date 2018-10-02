@@ -3,9 +3,7 @@ import unittest
 import numpy as np
 import cmath
 
-# SQUEAK modules
-from pypsqueak.squeakcore import Gate
-import pypsqueak.gates as gt
+# pypSQUEAK modules
 import pypsqueak.api as sq
 import pypsqueak.errors as sqerr
 from pypsqueak.noise import damping_map, depolarization_map, b_flip_map
@@ -13,69 +11,65 @@ from pypsqueak.noise import damping_map, depolarization_map, b_flip_map
 class NoiseInstructionInvalidInput(unittest.TestCase):
 
     def setUp(self):
-        # Test program
-        self.test_program = sq.Program()
-
-        # Test machine
-        self.test_qcvm = sq.qcVirtualMachine()
-
-        # A junk, syntactically correct gate target tuple for testing purposes
-        self.gtt = ("SomeGate", 0)
+        # Test register
+        self.test_reg = sq.qReg()
+        # Test op
+        self.test_op = sq.qOp()
 
     def test_kraus_ops_not_list(self):
         '''
-        If the kraus_ops argument of Program.add_instr() isn't a list, throw a TypeError.
+        A ``TypeError`` gets thrown if the argument of ``qOp.set_noise_model()``
+        is not a list.
         '''
 
         not_lists = ['apple', 3.153, (1, 2, 3)]
 
         for item in not_lists:
-            self.assertRaises(TypeError, self.test_program.add_instr, self.gtt, kraus_ops=item)
+            self.assertRaises(TypeError, self.test_op.set_noise_model, item)
 
     def test_kraus_ops_not_matricies(self):
         '''
-        Program.add_instr() throws a TypeError if any of the elements of
-        the kraus_ops list is not a numpy ndarray.
+        ``qOp.set_noise_model()`` throws a ``TypeError`` if any of the elements of
+        the ``kraus_ops`` list is not a numpy ndarray.
         '''
 
         one_not_like_the_other = [damping_map(0.5)[0], 'nothing to see here']
 
-        self.assertRaises(TypeError, self.test_program.add_instr, self.gtt,
-                          one_not_like_the_other)
+        self.assertRaises(TypeError, self.test_op.set_noise_model, one_not_like_the_other)
 
     def test_kraus_ops_inconsistent_shape(self):
         '''
-        Program.add_instr() throws a WrongShapeError if the shape of any of the matricies in
-        kraus_ops don't match all the rest.
+        The ``qOp.set_noise_model()`` method throws a ``WrongShapeError`` if the
+        shape of any of the matricies in in a list of Kraus operators don't
+        match all the rest.
         '''
 
         bad_kraus = [np.zeros((5, 2)), np.zeros((3, 17))]
 
-        self.assertRaises(sqerr.WrongShapeError, self.test_program.add_instr, self.gtt,\
-                          kraus_ops=bad_kraus)
+        self.assertRaises(sqerr.WrongShapeError, self.test_op.set_noise_model, bad_kraus)
 
     def test_wrong_number_kraus(self):
         '''
-        Program.add_instr() throws a TypeError if kraus_ops has less than two elements.
+        The ``qOp.set_noise_model()`` method throws a ``TypeError`` if the list
+        ``kraus_ops`` has less than two elements.
         '''
 
-        self.assertRaises(TypeError, self.test_program.add_instr,\
-                          self.gtt, kraus_ops=['one'])
+        self.assertRaises(TypeError, self.test_op.set_noise_model, ['one'])
 
     def test_kraus_gate_mismatch(self):
         '''
-        _qcVirtualMachine__instr() throws a WrongShapeError if the dimensions of the Kraus operators don't
-        match the dimensions of the gate.
+        An exception gets thrown if the dimensions of the Kraus operators don't
+        match the dimensions of the ``qOp`` when calling ``qOp.set_noise_model()``.
         '''
-        SWAP = Gate(gt._SWAP)
 
-        self.assertRaises(sqerr.WrongShapeError, self.test_qcvm._qcVirtualMachine__instr, SWAP,\
-                          0, 1, kraus_ops=damping_map(0.5))
+        size_of_two = sq.qOp().kron(sq.qOp())
+
+        self.assertRaises(sqerr.WrongShapeError, size_of_two.set_noise_model, damping_map(0.5))
 
     def test_kraus_ops_incomplete(self):
         '''
-        Program.add_instr() should throw a NormalizationError if the provided Kraus
-        operators don't satisfy the completeness relation.
+        A ``NormalizationError`` is thrown if the provided Kraus
+        operators aren't trace-preserving.
         '''
 
         # First construct a list of bad Kraus maps
@@ -85,7 +79,7 @@ class NoiseInstructionInvalidInput(unittest.TestCase):
 
         for bad_kraus in bad_kraus_maps:
             self.assertRaises(sqerr.NormalizationError,\
-                              self.test_program.add_instr, self.gtt, kraus_ops=bad_kraus)
+                              self.test_op.set_noise_model, kraus_ops=bad_kraus)
 
 if __name__ == '__main__':
     unittest.main()

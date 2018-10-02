@@ -1,26 +1,35 @@
-import context
+import context  # Remove this import if running with pip installed version.
 
-import pypsqueak.api as sq
+import numpy as np
+from pypsqueak.api import qReg, qOp
 from pypsqueak.gates import X, I
 from pypsqueak.noise import damping_map
 
-p = sq.Program()
-qcvm = sq.qcVirtualMachine()
+# Prep a qReg in the |1> state
+qubit = qReg()
+X.on(qubit)
 
-# Prep the 1 state
-p.add_instr(X(2))
-# Send it through an amp decay channel with 0.3 chance of decay
-p.add_instr(I(2), damping_map(0.3))
-# measure the resulting qubit
-p.measure(2, 0)
+# Send it through an amp decay channel with 0.3 chance of decay.
+prob = 0.3
+noisy_channel = qOp(kraus_ops=damping_map(prob))
 
 zeros = 0
 ones = 0
 n_runs = 1000
+
+print("Sending the state |1> through a noisy channel with amplitude decay probability={}...".format(prob))
 for i in range(n_runs):
-    if qcvm.execute(p)[0] == 0:
+    noisy_channel.on(qubit)
+    result = qubit.measure(0)
+    if result == 0:
         zeros += 1
+        # Reset qReg to |1> for next run.
+        X.on(qubit)
     else:
+        # No need to reset qReg
         ones += 1
 
-print(zeros/n_runs, ones/n_runs)
+error_bar = 0.5 * np.sqrt(1/n_runs)
+print("Observed probabilities")
+print("Zero measurement = {0:.3f} +/- {1:.2e}".format(zeros/n_runs, error_bar))
+print("One measurement = {0:.3f} +/- {1:.2e}".format(ones/n_runs, error_bar))

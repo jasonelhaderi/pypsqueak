@@ -12,14 +12,14 @@ class Qubit:
     complex vector. Its state (returned by ``state()``) is a one-dimensional
     numpy array consisting of the computational basis representation of the quantum
     state. By default it is initialized in the |0> state, but this can be
-    overridded if a ``Qubit`` is instantiated with some other numeric vector
+    overridden if a ``Qubit`` is instantiated with some other numeric vector
     as argument (the resulting ``Qubit`` will use the normalized version of
     that vector).
 
-    The state a ``Qubit`` can be changed with a call to ``change_state()``.
+    The state a ``Qubit`` can be changed with a call to ``Qubit.change_state()``.
     Additionally, a dictionary with computational basis state labels as keys
     and corresponding components as values gets returned by
-    ``computational_decomp()``.
+    ``Qubit.computational_decomp()``.
 
     Note that the length of a ``Qubit`` is the number of qubits that the state
     vector corresponds to (``log2(len(state_vector))``).
@@ -269,12 +269,12 @@ class Gate:
         # Checks that input is list-like
         if not isinstance(some_matrix, list) and not isinstance(some_matrix, tuple):
             if not isinstance(some_matrix, type(np.array([0]))):
-                raise ValueError('Input must be list, tuple, or numpy array.')
+                raise TypeError('Input must be list, tuple, or numpy array.')
 
         # Checks that input is matrix-like
         elif any(not isinstance(element, list) and not isinstance(element, tuple)\
                                                     for element in some_matrix):
-            raise ValueError('Input must be list-like of list-likes.')
+            raise TypeError('Input must be list-like of list-likes.')
 
         # Checks that the elements of input are numeric.
         for row in some_matrix:

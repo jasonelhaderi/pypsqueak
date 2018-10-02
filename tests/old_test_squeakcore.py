@@ -4,6 +4,7 @@ import numpy as np
 import cmath
 
 # pypSQUEAK modules
+import pypsqueak.gates as gt
 from pypsqueak.squeakcore import Qubit, Gate
 import pypsqueak.api as sq
 import pypsqueak.errors as sqerr
@@ -25,24 +26,8 @@ class QubitValidInput(unittest.TestCase):
     def setUp(self):
         self.test_qubit = sq.Qubit()
 
-    def test_change_and_initialize_equiv(self):
-        '''
-        Initalization of a ``Qubit`` as well as the ``Qubit.change_state()`` method
-        should result in the same state if handed the same argument.
-        '''
-
-        vectors = [[1, 0, 1, 1],
-                   [2, 14 - 8j],
-                   (0, 1, 0, 0, 0, 0, 0, 1)]
-
-        for vector in vectors:
-            self.test_qubit.change_state(vector)
-            np.testing.assert_array_equal(self.test_qubit.state(), Qubit(vector).state())
-
     def test_normalize_valid_input(self):
-        '''
-        ``Qubit.change_state()`` should rescale valid new states to unit vectors.
-        '''
+        '''self.__normalize() should rescale valid new states to be unit vectors'''
 
         for vec in self.valid_qubits:
             # get machine epsilon for relative error
@@ -60,9 +45,7 @@ class QubitValidInput(unittest.TestCase):
             self.assertTrue(norm_query)
 
     def test_known_qubit_product(self):
-        '''
-        Verifies proper result for ``Qubit.qubit_product()``.
-        '''
+        '''Verifies proper result for self.qubit_product()'''
 
         product_state_01 = np.array([0, 1, 0, 0])
         q1 = sq.Qubit([0, 1])
@@ -76,9 +59,7 @@ class QubitInvalidInput(unittest.TestCase):
         self.test_qubit = sq.Qubit()
 
     def test_not_list_or_tuple(self):
-        '''
-        ``Qubit.change_state()`` should fail when called on a non-listlike.
-        '''
+        '''self.__validate_state.() should fail for self.change_state(non-list or -tuple)'''
 
         not_list_or_tuple = [{'key':'value'},
                              4,
@@ -87,10 +68,7 @@ class QubitInvalidInput(unittest.TestCase):
             self.assertRaises(TypeError, self.test_qubit.change_state, candidate)
 
     def test_non_numeric_elements(self):
-        '''
-        ``Qubit.change_state()`` should fail for a list-like with nonnumeric
-        elements.
-        '''
+        '''self.__validate_state.() should fail for self.change_state(list with non-numeric elements)'''
 
         non_numeric_elements = [['string'],
                                 [['string'], ['string']],
@@ -105,9 +83,7 @@ class QubitInvalidInput(unittest.TestCase):
             self.assertRaises(TypeError, self.test_qubit.change_state, candidate)
 
     def test_wrong_length(self):
-        '''
-        ``Qubit.change_state()`` should fail for a vector with length that isn't a power of 2.
-        '''
+        '''self.__validate_state.() should fail for self.change_state(input with length = 1 or not power 2)'''
 
         wrong_length = [[0, 1, 34],
                         [7]]
@@ -115,21 +91,16 @@ class QubitInvalidInput(unittest.TestCase):
             self.assertRaises(sqerr.WrongShapeError, self.test_qubit.change_state, candidate)
 
     def test_zero_vector(self):
-        '''
-        ``Qubit.change_state()`` should fail for null vectors.
-        '''
+        '''self.__validate_state.() should fail for self.change_state(null vector, list, or tuple)'''
 
         null_vectors = [[0, 0],
                         [],
                         ()]
-
         for null_vec in null_vectors:
             self.assertRaises(sqerr.NullVectorError, self.test_qubit.change_state, null_vec)
 
     def test_empty_input_qubit_product(self):
-        '''
-        ``Qubit.qubit_product()`` with empty argument should raise a ``TypeError``.
-        '''
+        '''qubit_product with empty argument should raise a TypeError'''
 
         self.assertRaises(TypeError, sq.Qubit().qubit_product)
 
@@ -154,9 +125,7 @@ class GateValidInput(unittest.TestCase):
         self.gate_i = sq.Gate()
 
     def test_pauli_gates(self):
-        '''
-        Basic Pauli matricies should initialize correctly.
-        '''
+        '''Basic Pauli matricies should initialize correctly'''
 
         test_gates = [self.gate_x, self.gate_y, self.gate_z, self.gate_i]
         test_gates = zip(self.valid_gates, test_gates)
@@ -167,9 +136,7 @@ class GateValidInput(unittest.TestCase):
 class GateInvalidInput(unittest.TestCase):
 
     def test_non_list_non_tuple(self):
-        '''
-        ``Gate`` should fail to initialize if input not list-like of rows.
-        '''
+        '''Gate Should fail to initialize if input not list-like of rows'''
 
         not_list_of_rows = [2,
                             'string',
@@ -177,11 +144,11 @@ class GateInvalidInput(unittest.TestCase):
                             None]
 
         for candidate in not_list_of_rows:
-            self.assertRaises(TypeError, sq.Gate, candidate)
+            self.assertRaises(ValueError, sq.Gate, candidate)
 
     def test_non_numeric_elements(self):
         '''
-        ``Gate`` should fail to initialize if input elements aren't numeric.
+        Gate should fail to initialize if input elements aren't numeric.
         '''
 
         bad_matricies = [[[np.array([3, 4]), 6],[1, -1j]], (('item', 3), (3, 5))]
@@ -191,7 +158,7 @@ class GateInvalidInput(unittest.TestCase):
 
     def test_not_square(self):
         '''
-        ``Gate`` should fail to initialize if input doesn't have shape ``(n, n)``.
+        Gate should fail to initialize if input doesn't have shape (n, n).
         '''
 
         wrong_shapes = [[[]],
@@ -206,9 +173,7 @@ class GateInvalidInput(unittest.TestCase):
             self.assertRaises(sqerr.WrongShapeError, sq.Gate, candidate)
 
     def test_not_power_2(self):
-        '''
-        ``Gate`` should fail if matrix is not ``n``X``n`` for ``n == 1`` or ``n`` a power of 2.
-        '''
+        '''Gate should fail if matrix is not nXn for n == 1 or n a power of 2'''
 
         uneven_shape = [[1, 0, 0],
                         [0, 1, 0],
@@ -217,9 +182,7 @@ class GateInvalidInput(unittest.TestCase):
         self.assertRaises(sqerr.WrongShapeError, sq.Gate, uneven_shape)
 
     def test_not_unitary(self):
-        '''
-        ``Gate`` should fail to initialize non-unitary matrix.
-        '''
+        '''Gate should fail to initialize non-unitary matrix'''
 
         M1 = [[1, 5],
               [10, 7]]
@@ -239,10 +202,7 @@ class GateInvalidInput(unittest.TestCase):
 class GateProductValidInput(unittest.TestCase):
 
     def test_known_two_qubit_gates(self):
-        '''
-        Checks that known two-qubit gates are formed by ``Gate.gate_product()``
-        with one arg.
-        '''
+        '''Checks that known two-qubit gates are formed by gate_product with one arg'''
 
         gate_i = sq.Gate()
         gate_z = sq.Gate([[1, 0],
@@ -264,9 +224,7 @@ class GateProductValidInput(unittest.TestCase):
             np.testing.assert_array_equal(test, result)
 
     def test_empty_product(self):
-        '''
-        ``Gate.gate_product()`` should return ``self`` with no arguments.
-        '''
+        '''gate_product should return self with no arguments'''
 
         gate_z = sq.Gate([[1, 0],
                           [0, -1]])
@@ -275,9 +233,7 @@ class GateProductValidInput(unittest.TestCase):
         np.testing.assert_array_equal(gate_z.state(), gate_empty_arg.state())
 
     def test_two_args_identity(self):
-        '''
-        Checks that the tensor product of two identities with identity works.
-        '''
+        '''Checks that the tensor product of two identities with identity works'''
 
         gate_i = sq.Gate()
         gate_i_cubed = gate_i.gate_product(gate_i, gate_i)
@@ -288,9 +244,7 @@ class GateProductValidInput(unittest.TestCase):
 class GateProductInvalidInput(unittest.TestCase):
 
     def test_non_gate_input(self):
-        '''
-        ``Gate.gate_product()`` should fail with non ``Gate`` input.
-        '''
+        '''gate_product should fail with non Gate() input'''
 
         not_gates = [2, 16, [1, 2], [[1, 2], [2, 3]], []]
 
