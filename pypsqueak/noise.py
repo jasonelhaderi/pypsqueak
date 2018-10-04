@@ -1,35 +1,7 @@
 '''
 Implements functions returning sets of trace-one Kraus operators. Each function
-corresponds to a specific kind of one-qubit noise.
-
-Examples
---------
-Here we demonstrate one thousand measurements of the state |1> through a
-channel exhibiting amplitude damping with a 30% probability of decay to the |0>
-state.
-
->>> from pypsqueak.api import Program, qcVirtualMachine
->>> from pypsqueak.noise import damping_map
->>> from pypsqueak.gates import I
->>> p = Program()
->>> p.add_instr(X(0), damping_map(0.3))
->>> p.measure(0, 0)
->>> qcvm = qcVirtualMachine()
->>> decays = 0
->>> const = 0
->>> n_trials = 1000
->>> for i in range(n_trials):
-...     result = qcvm.execute(p)[0]
-...     if result == 1:
-...             const += 1
-...     else:
-...             decays += 1
-...
->>> const/n_trials
-0.681
->>> decays/n_trials
-0.319
-
+corresponds to a specific kind of one-qubit noise. For an example of usage, see
+:func:`~pypsqueak.api.qOp.set_noise_model`.
 '''
 
 import numpy as np

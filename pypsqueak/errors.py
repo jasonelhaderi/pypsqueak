@@ -24,20 +24,6 @@ class NonUnitaryInputError(ValueError):
     '''
     pass
 
-class UndeclaredGateError(NotImplementedError):
-    '''
-    Raised when the ``qcVirtualMachine`` runs a ``Program`` that calls
-    a quantum game before defining it.
-    '''
-    pass
-
-class UnknownInstruction(NotImplementedError):
-    '''
-    Catch all exception for malformed instructions which make it
-    to the ``qcVirtualMachine``.
-    '''
-    pass
-
 class IllegalRegisterReference(NameError):
     '''
     Raised when any kind of operation is attempted on a killed qReg.

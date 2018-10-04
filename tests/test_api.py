@@ -43,7 +43,7 @@ class qRegSuccess(unittest.TestCase):
         self.test_op.on(self.test_reg)
         np.testing.assert_array_equal(self.test_reg.dump_state(), np.array([1, 0]))
 
-    def test_no_target_measure_observable(self):
+    def test_measure_observable_smaller_than_reg(self):
         '''
         Verifies default behavior of ``qRef.measure_observable()`` is to prefix
         observable on the left with the identity when ``qReg.size() > observable.size()``.

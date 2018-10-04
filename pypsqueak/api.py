@@ -259,8 +259,6 @@ class qReg:
             diff = len(self) - observable.size()
             iden = qOp(np.eye(2**diff))
             observable = iden.kron(observable)
-            for i in range(len(self) - observable.size()):
-                observable = observable.kron(iden)
 
         # Determine normalized eigenvalue/vector pairs.
         e_vals, e_vecs = np.linalg.eig(observable._qOp__state.state())
@@ -451,9 +449,6 @@ class qReg:
         else:
             return "Dereferenced qReg"
 
-
-# Parametric qOps can be accommodated by defining a function that returns
-# a qOp.
 class qOp:
 
     '''
@@ -613,7 +608,7 @@ class qOp:
         same dimensions, match the size of the ``qOp``, and collectively be
         trace-preserving.
 
-        By defualt ``kraus_ops = None``; the ``qOp`` is then noiselessly emulated. Note that
+        By defualt ``kraus_ops = None``. The ``qOp`` is then noiselessly emulated. Note that
         this method would be absent from a hardware implementation of SQUEAK.
 
         Parameters
@@ -688,15 +683,23 @@ class qOp:
 
     def on(self, q_reg, *targets):
         '''
-        Applies a ``qOp`` to a ``qReg``.
+        Applies a ``qOp`` to a ``qReg``. If the size of the ``qOp`` agrees with
+        the size of the ``qReg``, no target qubits are required. If the ``qOp``
+        is smaller than the ``qReg``, the ``qOp`` is lifted to the higher-dimensional
+        Hilbert space of the ``qReg``. In that case, n target qubits must be,
+        specified, where n is the size of the ``qOp`` before lifting. If the
+        size of the ``qOp`` is larger than the size of the ``qReg``, an
+        exception is raised.
 
-        If the size of the ``qOp`` is smaller than the size of the ``qReg``,
-        then the method must be called with at least one target. These targets
-        specify how to order the qubits in the ``qReg`` before application of
-        the operator. From left to right, the qubits named in ``targets`` are
-        swapped in turn to the lowest positions in the register. All remaining
-        qubits get bumped up to the next highest available register locations.
-        After operation, the ``qReg`` is permuted back to its original ordering.
+        When the size of the ``qOp`` is smaller than the size of the ``qReg``,
+        the ``targets`` specify how to order the qubits in the ``qReg``
+        before application of the lifted operator (that is, the tensor product
+        I^n (x) ``qOp``, where n is the length of the ``qReg`` minus the size of
+        the ``qOp``). From left to right, the qubits named in the ``targets``
+        are swapped with the qubits at addresses zero, one, two, etc. All remaining
+        qubits get bumped up to the next highest available register addresses which
+        were NOT involved in the swap. After operation with the lifted ``qOp``,
+        the ``qReg`` is permuted back to its original ordering.
 
         As an example, if a ``qReg`` is in the state |abcdef> and
         and ``qOp.on()`` is called with with ``targets`` = [3, 0, 4, 1], then
@@ -762,13 +765,6 @@ class qOp:
         if len(targets) == 0 and self.size() != len(q_reg):
             raise IndexError('One or more targets must be specified for gate and register of different size.')
 
-        ### OLD SWAP METHOD ###
-        # Or, make dummy targets when gate and register sizes do match. These dummy targets
-        # simply preserve the order of the qubits in the register.
-        # if len(targets) == 0 and self.size() == len(q_reg):
-        #     targets = [i for i in range(self.size())]
-        ### OLD SWAP METHOD END ###
-
         # Check that there are no duplicate register locations for the instruction
         if len(targets) != len(set(targets)):
             raise ValueError('Specified quantum register targets must be unique.')
@@ -800,27 +796,6 @@ class qOp:
         before_swap_and_op = q_reg._qReg__q_reg.state()
         after_swap_before_op = np.dot(swap, before_swap_and_op)
 
-        ### OLD SWAP METHOD ###
-        # # Swap operational qubits into order specified by targets args.
-        # # First we generate pairs of swaps to make, using a set to avoid duplicates.
-        # # q_flag increases from initially pointing at the zero qubit by one on each
-        # # loop.
-        # q_flag = 0
-        # swap_pairs = set()
-        # for reg_loc in targets:
-        #     swap_pairs.add((q_flag, reg_loc))
-        #     q_flag += 1
-        #
-        # # Remove duplicates
-        # swap_pairs = set((a,b) if a<=b else (b,a) for a,b in swap_pairs)
-        #
-        # # Perform swaps of qubits into the operational order (first specified qubit
-        # # in q_reg_loc 0, second in q_reg_loc 1, etc.)
-        #
-        # for swap_pair in swap_pairs:
-        #     self.__swap(q_reg, swap_pair[0], swap_pair[1])
-        ### OLD SWAP METHOD END ###
-
         # If the gate and size of the quantum register match, just operate with the gate
         if len(q_reg) == self.size():
             operator = self.__state
@@ -837,11 +812,7 @@ class qOp:
 
         # If no Kraus operators are specified, evaluation of new register state is trivial
         if self.__noise_model == None:
-            # print("\tOp:", operator.state())
-            # print("\tState:", q_reg.peek())
             after_swap_after_op = np.dot(operator.state(), after_swap_before_op)
-            # q_reg._qReg__q_reg.change_state(after_swap_after_op)
-            # print("\tNew State:", q_reg.peek())
 
         else:
             # We randomly choose one of the Kraus operators to apply, then we
@@ -869,15 +840,9 @@ class qOp:
             # Pick one of the transformed states according to probs
             new_state_index = np.random.choice([i for i in range(len(new_state_ensemble))], p=probs)
             after_swap_after_op = new_state_ensemble[new_state_index]
-            # q_reg._qReg__q_reg.change_state(after_swap_after_op)
 
         new_reg_state = np.dot(swap_inverse, after_swap_after_op)
         q_reg._qReg__q_reg.change_state(new_reg_state)
-        ### OLD SWAP METHOD ###
-        # # Swap qubits back into original order
-        # for swap_pair in swap_pairs:
-        #     self.__swap(q_reg, swap_pair[0], swap_pair[1])
-        ### OLD SWAP METHOD END ###
 
     def __generate_swap(self, q_reg, *targets):
         '''
@@ -942,93 +907,15 @@ class qOp:
 
         return swap_matrix, swap_matrix_inverse
 
-    ### OLD SWAP METHOD ###
-    # def __swap(self, q_reg, i, j):
-    #     # Method for swapping the ith and jth qubits in a quantum register.
-    #     # Swaps higher of i and j by taking the upper index down abs(i - j) times,
-    #     # and then taking the lower index up abs(i - j) - 1 times
-    #     if not isinstance(i, int) or not isinstance(j, int):
-    #         raise IndexError('Quantum register indicies must be integer-valued.')
-    #
-    #     if i == j:
-    #         return None
-    #
-    #     upper_index = max(i, j)
-    #     lower_index = min(i, j)
-    #     difference = abs(i - j)
-    #
-    #     # Bring upper down with 'difference' elementary swaps (left prepends SWAP, right post)
-    #     for k in range(difference):
-    #         # Indicies for elementary swap on kth loop
-    #         simple_lower = upper_index - (1 + k)
-    #         simple_upper = upper_index - k
-    #
-    #         self.__elementary_swap(q_reg, simple_lower, simple_upper)
-    #
-    #     # Bring lower up with (difference - 1) elementary swaps (left prepends SWAP, right post)
-    #     for k in range(difference - 1):
-    #         # Indicies for elementary swap on kth loop
-    #         simple_lower = lower_index + (1 + k)
-    #         simple_upper = lower_index + (2 + k)
-    #
-    #         self.__elementary_swap(q_reg, simple_lower, simple_upper)
-    #
-    # def __elementary_swap(self, q_reg, simple_lower, simple_upper):
-    #     # Helper method to swap adjacent qubits in the quantum register.
-    #
-    #     # Raise IndexError if swap indicies reference location in the quantum register
-    #     # that doesn't exist
-    #     if simple_lower < 0 or simple_lower > (len(q_reg) - 1):
-    #         raise IndexError("One or more register locations specified in swap doesn't exist.")
-    #
-    #     if simple_upper < 0 or simple_upper > (len(q_reg) - 1):
-    #         raise IndexError("One or more register locations specified in swap doesn't exist.")
-    #
-    #     # Initialize identity and swap gates for later use (and throw away target qubit)
-    #     iden = Gate()
-    #     swap = Gate([[1, 0, 0, 0],
-    #                  [0, 0, 1, 0],
-    #                  [0, 1, 0, 0],
-    #                  [0, 0, 0, 1]])
-    #
-    #     # Note that lower index corresponds to right-hand factors, upper index to left-hand
-    #     number_right_eye = int(simple_lower)
-    #     number_left_eye = int(len(q_reg) - simple_upper - 1)
-    #
-    #     if number_left_eye > 0 and number_right_eye > 0:
-    #         # Prep identity factors
-    #         left_eye = iden.gate_product(*[iden for l in range(number_left_eye - 1)])
-    #         right_eye = iden.gate_product(*[iden for l in range(number_right_eye - 1)])
-    #
-    #         raised_swap = left_eye.gate_product(swap, right_eye)
-    #         new_swap_state = np.dot(raised_swap.state(), q_reg._qReg__q_reg.state())
-    #         q_reg._qReg__q_reg.change_state(new_swap_state)
-    #
-    #     elif number_left_eye > 0 and number_right_eye == 0:
-    #         # Prep identity factors
-    #         left_eye = iden.gate_product(*[iden for l in range(number_left_eye - 1)])
-    #
-    #         raised_swap = left_eye.gate_product(swap)
-    #         new_swap_state = np.dot(raised_swap.state(), q_reg._qReg__q_reg.state())
-    #         q_reg._qReg__q_reg.change_state(new_swap_state)
-    #
-    #     elif number_left_eye == 0 and number_right_eye > 0:
-    #         # Prep identity factors
-    #         right_eye = iden.gate_product(*[iden for l in range(number_right_eye - 1)])
-    #
-    #         raised_swap = swap.gate_product(right_eye)
-    #         new_swap_state = np.dot(raised_swap.state(), q_reg._qReg__q_reg.state())
-    #         q_reg._qReg__q_reg.change_state(new_swap_state)
-    #
-    #     elif number_left_eye == 0 and number_right_eye == 0:
-    #         raised_swap = swap
-    #         new_swap_state = np.dot(raised_swap.state(), q_reg._qReg__q_reg.state())
-    #         q_reg._qReg__q_reg.change_state(new_swap_state)
-    ### OLD SWAP METHOD END ###
-
     def dagger(self):
         '''
-        Returns the Hermitian conjugate.
+        Returns the Hermitian conjugate of the ``qOp``. This is equivalent to
+        the transpose conjugate of the matrix representation.
+
+        Returns
+        -------
+        pypsqueak.api.qOp
+            The Hermitian conjugate of the operator.
         '''
 
         herm_trans = self.__state.state().conj().T
@@ -1049,8 +936,48 @@ class qOp:
 
     def kron(self, another_op, *more_ops):
         '''
-        Returns the tensor product (Kronecker product) self (x) another_op.
-        Optionally computes self (x) another_op (x) *more_ops for more qOps.
+        Returns the tensor product (implemented as a matrix Kronecker product)
+        of ``self`` (x) ``another_op``. Optionally continues to tensor-in
+        additional ops in ``more_ops``.
+
+        Parameters
+        ----------
+        another_op : pypsqueak.api.qOp
+            Right-hand factor in Kronecker product.
+        *more_ops : pypsqueak.api.qOp
+            Additional optional factors in Kronecker product.
+
+        Returns
+        -------
+        pypsqueak.api.qOp
+            Kronecker product.
+
+        Examples
+        --------
+        Here we build the identity operator acting on three qubits:
+
+        >>> from pypsqueak.api import qOp
+        >>> iden_3 = qOp().kron(qOp(), qOp())
+        >>> iden_3
+        [[1 0 0 0 0 0 0 0]
+         [0 1 0 0 0 0 0 0]
+         [0 0 1 0 0 0 0 0]
+         [0 0 0 1 0 0 0 0]
+         [0 0 0 0 1 0 0 0]
+         [0 0 0 0 0 1 0 0]
+         [0 0 0 0 0 0 1 0]
+         [0 0 0 0 0 0 0 1]]
+
+        Less trivially, let's make the operator applying an X gate to the first
+        qubit and the identity operator to the zeroeth qubit:
+
+        >>> from pypsqueak.gates import X
+        >>> X.kron(qOp())
+        [[0 0 1 0]
+         [0 0 0 1]
+         [1 0 0 0]
+         [0 1 0 0]]
+
         '''
 
         if not isinstance(another_op, type(qOp())):
@@ -1071,9 +998,16 @@ class qOp:
 
 class qOracle(qOp):
     '''
-    Implements a transformation corresponding to bitwise XOR with classical
-    function f: U_f|x>|y> = |x>|y XOR f(x)>. Note XOR reduces to mod 2 addition
-    when y and f(x) are both one bit long.
+    Subclass of ``qOp``. Useful for representing quantum black-boxes, such as
+    that appearing in the Deutsch-Jozsa algorithm.
+
+    ``qOracle`` implements a unitary transformation U_f|x>|y> = |x>|y XOR f(x)>
+    where the classical function f maps nonnegative integers to nonnegative
+    integers. Note that XOR is performed bitwise on the computational basis
+    label y and f(x). This reduces to mod 2 addition when y and f(x) are both
+    one bit long. ``n`` specifies the number of qubits in the left side portion
+    of the quantum register, while ``m`` specifies the number of qubits in the
+    right side portion.
     '''
 
     def __init__(self, func, n, m=1, kraus_ops=None):
@@ -1100,6 +1034,35 @@ class qOracle(qOp):
     def classical_func(self, x_val):
         '''
         Returns the classical value of the function implemented by the ``qOracle``.
+        Raises an exception if the argument isn't nonnegative or if larger than
+        the ``n`` portion of the intended register.
+
+        Parameters
+        ----------
+        x_val : int
+            Argument of function.
+
+        Returns
+        -------
+        int
+            Value of the function.
+
+        Examples
+        --------
+
+        >>> from pypsqueak.api import qOracle
+        >>> black_box = qOracle(lambda x: 0, 2)
+        >>> black_box.classical_func(1)
+        0
+        >> black_box.classical_func(3)
+        0
+        >> black_box.classical_func(3)
+        Traceback (most recent call last):
+        File "<stdin>", line 1, in <module>
+        File "pypsqueak/api.py", line 1065, in classical_func
+            raise ValueError("Classical function input out of bounds.")
+        ValueError: Classical function input out of bounds.
+
         '''
 
         if not isinstance(x_val, int):

@@ -1,5 +1,6 @@
 '''
-Provides core ``Qubit`` and ``Gate`` objects.
+Provides core ``Qubit`` and ``Gate`` objects that function as the simulated
+backend of pypSQUEAK.
 '''
 
 import numpy as np
@@ -29,6 +30,7 @@ class Qubit:
     Here we initialize a ``Qubit`` in the |0> state, and then change it to the
     |11> state.
 
+    >>> from pypsqueak.squeakcore import Qubit
     >>> q = Qubit()
     >>> p = Qubit([0, 1, 0, 0])
     >>> q
@@ -190,6 +192,8 @@ class Qubit:
 
         Examples
         --------
+
+        >>> from pypsqueak.squeakcore import Qubit
         >>> q1 = Qubit()
         >>> q2 = Qubit([0, 1])
         >>> q3 = Qubit([1, 0, 0, 0])
@@ -239,6 +243,8 @@ class Gate:
 
     Examples
     --------
+
+    >>> from pypsqueak.squeakcore import Gate
     >>> g1 = Gate()
     >>> g1
     [[1 0]
@@ -371,6 +377,8 @@ class Gate:
 
         Examples
         --------
+
+        >>> from pypsqueak.squeakcore import Gate
         >>> g1 = Gate()
         >>> g2 = Gate([[0, 1], [1, 0]])
         >>> g1_g2 = g1.gate_product(g2)
