@@ -400,7 +400,7 @@ class qReg:
         Concatentates the register with some_reg (|a_reg> *= |some_reg> stores
         |a_reg>|some_reg> into ``a_reg``).
         '''
-        if self.__killed:
+        if self.__killed or some_reg.__killed:
             raise sqerr.IllegalRegisterReference('Concatentation attempted on dereferenced register.')
 
         if not isinstance(some_reg, type(qReg())):
@@ -418,7 +418,7 @@ class qReg:
         (|new> = |reg> * |another_reg> stores the product into ``new``).
         '''
 
-        if self.__killed:
+        if self.__killed or another_reg.__killed:
             raise sqerr.IllegalRegisterReference('Concatentation attempted on dereferenced register.')
 
         new_register = qReg()

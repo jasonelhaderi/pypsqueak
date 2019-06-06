@@ -96,6 +96,21 @@ class qRegFailure(unittest.TestCase):
         self.assertRaises(sqerr.IllegalCopyAttempt, copy.copy, self.test_reg)
         self.assertRaises(sqerr.IllegalCopyAttempt, copy.deepcopy, self.test_reg)
 
+    def test_mult_checks_both_regs_for_dereference(self):
+        '''
+        Verifies that multiplication checks whether both argument registers are
+        dereferenced. Added in pypSQUEAK 2.0.1.
+        '''
+
+        # Produce an active and dereferenced register (b and a, respectively).
+        a = sq.qReg()
+        b = a * sq.qReg()
+
+        self.assertRaises(sqerr.IllegalRegisterReference, a.__mul__, b)
+        self.assertRaises(sqerr.IllegalRegisterReference, b.__mul__, a)
+        self.assertRaises(sqerr.IllegalRegisterReference, a.__imul__, b)
+        self.assertRaises(sqerr.IllegalRegisterReference, b.__imul__, a)
+
     def test_register_dereferencing(self):
         '''
         Verifies that ``qReg`` instances get dereferenced in cases where
