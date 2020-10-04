@@ -70,6 +70,79 @@ class QubitValidInput(unittest.TestCase):
 
         np.testing.assert_array_equal(product_state_01, test_product_state_01.state())
 
+    def test_computational_decomp_two_qubits(self):
+        '''
+        Checks that ``Qubit.computational_decomp()`` is correct for a Bell pair.
+        '''
+
+        bell_pair = sq.Qubit([1, 0, 0, 1])
+        expected_decomposition = {
+            '00': 1/np.sqrt(2),
+            '01': 0,
+            '10': 0,
+            '11': 1/np.sqrt(2)
+        }
+
+        self.assertDictEqual(expected_decomposition, bell_pair.computational_decomp())
+
+    def test_computational_decomp_three_qubits(self):
+        '''
+        Checks that ``Qubit.computational_decomp()`` is correct for a three qubit state.
+        '''
+
+        bell_pair = sq.Qubit([1, 0, 1, 0, 0, 0, 0, 1])
+        expected_decomposition = {
+            '000': 1/np.sqrt(3),
+            '001': 0,
+            '010': 1/np.sqrt(3),
+            '011': 0,
+            '100': 0,
+            '101': 0,
+            '110': 0,
+            '111': 1/np.sqrt(3)
+        }
+        
+        self.assertDictEqual(expected_decomposition, bell_pair.computational_decomp())
+
+    def test_string_rep_bell_state(self):
+        '''
+        Checks that ``str(Qubit)`` is correct for a Bell state.
+        '''
+
+        bell_pair = sq.Qubit([1, 0, 0, -1])
+        expected_rep = '(7.07e-01)|00> + (-7.07e-01)|11>'
+
+        self.assertEqual(expected_rep, str(bell_pair))
+
+    def test_string_rep_first_term_negative(self):
+        '''
+        Checks that ``str(Qubit)`` is correct for a state with a negative first term.
+        '''
+
+        qubit = sq.Qubit([-1, 0, 0, 0, 0, 0, 2, 1])
+        expected_rep = '(-4.08e-01)|000> + (8.16e-01)|110> + (4.08e-01)|111>'
+
+        self.assertEqual(expected_rep, str(qubit))
+
+    def test_string_rep_later_term_negative(self):
+        '''
+        Checks that ``str(Qubit)`` is correct for a state with a term other than the first negative.
+        '''
+        qubit = sq.Qubit([1, 0, 0, 0, 0, 0, -2, 1])
+        expected_rep = '(4.08e-01)|000> + (-8.16e-01)|110> + (4.08e-01)|111>'
+
+        self.assertEqual(expected_rep, str(qubit))
+
+    def test_string_rep_complex_term(self):
+        '''
+        Checks that ``str(Qubit)`` is correct for a state with a complex term.
+        '''
+
+        qubit = sq.Qubit([1 - 1j, 1j])
+        expected_rep = '(5.77e-01-5.77e-01j)|0> + (5.77e-01j)|1>'
+
+        self.assertEqual(expected_rep, str(qubit))
+
 class QubitInvalidInput(unittest.TestCase):
 
     def setUp(self):

@@ -46,33 +46,22 @@ class Qubit:
     '''
 
     def __init__(self, init_state = [1, 0]):
-        # Checks that input is valid.
-        self.__validate_state(init_state)
-
-        # Initialize qubit.
-        self.__state = np.array(init_state)
-        self.__normalize()
-        self.__decompose_into_comp_basis()
+        self.__state = None
+        self.__computational_decomp = None
+        
+        self.change_state(init_state)
 
     def __validate_state(self, some_vector):
-        # Checks that some_vector is a list or tuple.
-        if type(some_vector) != list and type(some_vector) != tuple:
-            if not isinstance(some_vector, type(np.array([0]))):
-                raise TypeError('Input state must be a list, tuple, or numpy array.')
+        if not self.__is_listlike(some_vector):
+            raise TypeError('Input state must be a list, tuple, or numpy array.')
 
-        # Checks that elements of some_vector are numeric.
-        for element in some_vector:
-            try:
-                element + 5
-            except:
-                raise TypeError('Elements of input state must be numeric.')
+        if not self.__has_only_numeric_elements(some_vector):
+            raise TypeError('Elements of input state must be numeric.')
 
-        # Checks that the some_vector isn't null, or the null vector.
-        if all(element == 0 for element in some_vector):
+        if not self.__is_normalizable(some_vector):
             raise sqerr.NullVectorError('State cannot be the null vector.')
 
-        # Checks that some_vector has length greater than 1 which is a power of 2.
-        if not sqerr._is_power_2(len(some_vector)) or len(some_vector) == 1:
+        if not self.__length_is_power_of_two(some_vector):
             raise sqerr.WrongShapeError('Input state must have a length > 1 which is a power of 2.')
 
     def change_state(self, new_state):
@@ -92,7 +81,6 @@ class Qubit:
             The Qubit instance on which ``change_state()`` is called is
             altered.
         '''
-        # Checks that input is valid.
         self.__validate_state(new_state)
 
         # Changes the state.
@@ -134,42 +122,87 @@ class Qubit:
     def __decompose_into_comp_basis(self):
         # Generates a dict with basis state labels as keys and amplitudes as values
         self.__computational_decomp = {}
-        padding = len(format(len(self.__state), 'b')) - 1
-        label = format(0, 'b').zfill(padding)
-        amplitude = self.__state[0]
-        self.__computational_decomp[label] = amplitude
+        number_of_qubits = len(self)
 
-        for i in range(1, len(self.__state)):
-            label = format(i, 'b').zfill(padding)
-            amplitude = self.__state[i]
-            self.__computational_decomp[label] = amplitude
+        # Loop over self.__state since we need each basis state amplitude.
+        for basis_index in range(0, len(self.__state)):
+            basis_label = self.__convert_to_binary_string(basis_index, number_of_qubits)
+            amplitude = self.__state[basis_index]
+            self.__computational_decomp[basis_label] = amplitude
 
+    def __is_listlike(self, potential_vector):
+        if (type(potential_vector) != list
+            and type(potential_vector) != tuple
+            and (not isinstance(potential_vector, type(np.array([0]))))):
+                return False
+        else:
+            return True
+
+
+    def __has_only_numeric_elements(self, potential_vector):
+        for element in potential_vector:
+            try:
+                element + 5
+            except:
+                return False
+
+        return True
+
+    def __is_normalizable(self, some_vector):
+        if all(element == 0 for element in some_vector):
+            return False
+        else:
+            return True
+
+    def __length_is_power_of_two(self, some_vector):
+        if not sqerr._is_power_2(len(some_vector)) or len(some_vector) == 1:
+            return False
+        else:
+            return True
+
+    def __convert_to_binary_string(self, number, length):
+        # Returns ``number`` as a binary string with length ``length``, filling in zeros.
+        return format(number, 'b').zfill(length)
+            
     def __len__(self):
-        # Note that this returns the number of qubits that the given Qubit object
-        # corresponds to, not the number of components its vector representation has
+        # The number of qubits that the given Qubit corresponds to, not the number of components its vector representation has.
         return int(np.log2(len(self.__state)))
 
     def __repr__(self):
-        return str(self.__state)
+        return "Qubit({})".format(repr(self.__state))
 
     def __str__(self):
-        # Generates a string representation of the state in the computational basis
-        first_term_flag = 0
+        # Generates a string representation of the state in the computational basis.
         state_rep = ""
         for state_label in self.__computational_decomp:
-            # This if statement supresses terms with zero magnitude.
-            if not self.__computational_decomp[state_label] == 0\
-                and not self.__computational_decomp[state_label] == 0 + 0j:
-                if first_term_flag == 0:
-                    state_rep += "({0:.2e})|{1}>".format(self.__computational_decomp[state_label], state_label)
-                    first_term_flag = 1
-
-                elif first_term_flag == 1:
-                    state_rep += " + ({:.2e})|{}>".format(self.__computational_decomp[state_label], state_label)
+            if self.__computational_decomp[state_label] == 0 + 0j:
+                continue
+            elif len(state_rep) == 0:
+                state_rep += self.__make_basis_term_string_rep(
+                    self.__computational_decomp[state_label],
+                    state_label
+                )
             else:
-                pass
+                state_rep += " + " + self.__make_basis_term_string_rep(
+                    self.__computational_decomp[state_label],
+                    state_label
+                )
 
         return state_rep
+
+    def __make_basis_term_string_rep(self, amplitude, basis_state_label):
+        if not isinstance(amplitude, complex):
+            term_rep = "({:.2e})|{}>".format(amplitude, basis_state_label)
+        elif amplitude == 0 + 0j:
+            term_rep = "(0)|{}>".format(basis_state_label)
+        elif amplitude.imag == 0:
+            term_rep = "({:.2e})|{}>".format(amplitude.real, basis_state_label)
+        elif amplitude.real == 0:
+            term_rep = "({:.2e}j)|{}>".format(amplitude.imag, basis_state_label)
+        else:
+            term_rep = "({:.2e})|{}>".format(amplitude, basis_state_label)
+            
+        return term_rep
 
     def qubit_product(self, *arg):
         '''

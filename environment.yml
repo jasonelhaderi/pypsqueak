@@ -1,0 +1,4 @@
+name: pypsqueak
+dependencies:
+  - python=3.*
+  - numpy=1.*
