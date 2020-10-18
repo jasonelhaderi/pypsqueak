@@ -295,23 +295,16 @@ class Gate:
     '''
 
     def __init__(self, some_matrix = [(1, 0), (0, 1)], name = None):
-        # Checks that input is list-like
-        if not isinstance(some_matrix, list) and not isinstance(some_matrix, tuple):
-            if not isinstance(some_matrix, type(np.array([0]))):
-                raise TypeError('Input must be list, tuple, or numpy array.')
+        
+        if not _is_listlike(some_matrix):
+            raise TypeError('Input must be list, tuple, or numpy array.')
 
-        # Checks that input is matrix-like
-        elif any(not isinstance(element, list) and not isinstance(element, tuple)\
-                                                    for element in some_matrix):
-            raise TypeError('Input must be list-like of list-likes.')
-
-        # Checks that the elements of input are numeric.
         for row in some_matrix:
-            for element in row:
-                try:
-                    element + 5
-                except:
-                    raise TypeError("Elements of input must be numeric.")
+            if not _is_listlike(row):
+                raise TypeError('Input must be matrix-like (list-like of list-likes).')
+            elif not _has_only_numeric_elements(row):
+                raise TypeError("Elements of input matrix rows must be numeric.")
+
 
         # Checks that the input is a square matrix
         self.__shape = (len(some_matrix), len(some_matrix[0]))
@@ -449,22 +442,25 @@ class Gate:
             return str(self.__state)
 
 
-def _is_listlike(potential_vector):
-    if (type(potential_vector) != list
-        and type(potential_vector) != tuple
-        and (not isinstance(potential_vector, type(np.array([0]))))):
+def _is_listlike(obj):
+    if (type(obj) != list
+        and type(obj) != tuple
+        and not isinstance(obj, type(np.array([0])))):
             return False
     else:
         return True
 
 
-def _has_only_numeric_elements(potential_vector):
-
-    for element in potential_vector:
-        try:
-            element + 5
-        except:
+def _has_only_numeric_elements(obj):
+    
+    for element in obj:
+        if hasattr(element, '__iter__'):
             return False
+        else:
+            try:
+                element + 5
+            except:
+                return False
 
     return True
 
