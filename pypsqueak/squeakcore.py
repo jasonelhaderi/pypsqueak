@@ -51,19 +51,6 @@ class Qubit:
         self.__computational_decomp = None     
         self.change_state(init_state)
 
-    def __validate_state(self, some_vector):
-        if not self.__is_listlike(some_vector):
-            raise TypeError('Input state must be a list, tuple, or numpy array.')
-
-        if not self.__has_only_numeric_elements(some_vector):
-            raise TypeError('Elements of input state must be numeric.')
-
-        if not self.__is_normalizable(some_vector):
-            raise sqerr.NullVectorError('State cannot be the null vector.')
-
-        if not self.__length_is_power_of_two(some_vector):
-            raise sqerr.WrongShapeError('Input state must have a length > 1 which is a power of 2.')
-
     def change_state(self, new_state):
         '''
         Changes the state of the Qubit to the normalized vector corresponding to
@@ -114,6 +101,74 @@ class Qubit:
 
         return copy.deepcopy(self.__computational_decomp)
 
+    def qubit_product(self, *arg):
+        '''
+        Returns the Kronecker product of a ``Qubit`` with one or more other
+        ``Qubit`` objects.
+
+        When multiple arguments are specified, the product is computed
+        sequentially from the leftmost argument to the rightmost.
+
+        Parameters
+        ----------
+        *arg : pypsqueak.squeakcore.Qubit
+            One or more ``Qubit`` objects. Raises an exception if called with
+            no arguments.
+
+        Returns
+        -------
+        pypsqueak.squeakcore.Qubit
+            The left to right Kronecker product.
+
+        Examples
+        --------
+
+        >>> from pypsqueak.squeakcore import Qubit
+        >>> q1 = Qubit()
+        >>> q2 = Qubit([0, 1])
+        >>> q3 = Qubit([1, 0, 0, 0])
+        >>> q1_q2 = q1.qubit_product(q2)
+        >>> q1_q2
+        [1. 0.]
+        >>> q1_q2.state()
+        array([0., 1., 0., 0.])
+        >>> q2_q1 = q2.qubit_product(q1)
+        >>> q2_q1
+        [0. 0. 1. 0.]
+        >>> q1_q2_q3 = q1.qubit_product(q2, q3)
+        >>> q1_q2_q3
+        [0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
+
+        '''
+        
+        if len(arg) == 0:
+            raise TypeError('Must specify at least one argument.')
+
+        for argument in arg:
+            if not isinstance(argument, type(Qubit())):
+                raise TypeError('Arguments must be Qubit() objects.')
+
+        product_state = self.__state
+            
+        for argument in arg:
+            product_state = np.kron(product_state, argument.state())
+            
+        return Qubit(product_state)
+
+    
+    def __validate_state(self, some_vector):
+        if not _is_listlike(some_vector):
+            raise TypeError('Input state must be a list, tuple, or numpy array.')
+
+        if not _has_only_numeric_elements(some_vector):
+            raise TypeError('Elements of input state must be numeric.')
+
+        if not _is_normalizable(some_vector):
+            raise sqerr.NullVectorError('State cannot be the null vector.')
+
+        if not _length_is_power_of_two(some_vector):
+            raise sqerr.WrongShapeError('Input state must have a length > 1 which is a power of 2.')
+    
     def __normalize(self):
         
         dual_state = np.conjugate(self.__state)
@@ -135,39 +190,6 @@ class Qubit:
             basis_label = self.__convert_to_binary_string(basis_state, number_of_qubits)
             amplitude = self.__state[basis_state]
             self.__computational_decomp[basis_label] = amplitude
-
-    def __is_listlike(self, potential_vector):
-        if (type(potential_vector) != list
-            and type(potential_vector) != tuple
-            and (not isinstance(potential_vector, type(np.array([0]))))):
-                return False
-        else:
-            return True
-
-
-    def __has_only_numeric_elements(self, potential_vector):
-        
-        for element in potential_vector:
-            try:
-                element + 5
-            except:
-                return False
-
-        return True
-
-    def __is_normalizable(self, some_vector):
-        
-        if all(element == 0 for element in some_vector):
-            return False
-        else:
-            return True
-
-    def __length_is_power_of_two(self, some_vector):
-        
-        if not sqerr._is_power_2(len(some_vector)) or len(some_vector) == 1:
-            return False
-        else:
-            return True
 
     def __convert_to_binary_string(self, number, length):
         '''
@@ -226,60 +248,6 @@ class Qubit:
             term_rep = "({:.2e})|{}>".format(amplitude, basis_state_label)
             
         return term_rep
-
-    def qubit_product(self, *arg):
-        '''
-        Returns the Kronecker product of a ``Qubit`` with one or more other
-        ``Qubit`` objects.
-
-        When multiple arguments are specified, the product is computed
-        sequentially from the leftmost argument to the rightmost.
-
-        Parameters
-        ----------
-        *arg : pypsqueak.squeakcore.Qubit
-            One or more ``Qubit`` objects. Raises an exception if called with
-            no arguments.
-
-        Returns
-        -------
-        pypsqueak.squeakcore.Qubit
-            The left to right Kronecker product.
-
-        Examples
-        --------
-
-        >>> from pypsqueak.squeakcore import Qubit
-        >>> q1 = Qubit()
-        >>> q2 = Qubit([0, 1])
-        >>> q3 = Qubit([1, 0, 0, 0])
-        >>> q1_q2 = q1.qubit_product(q2)
-        >>> q1_q2
-        [1. 0.]
-        >>> q1_q2.state()
-        array([0., 1., 0., 0.])
-        >>> q2_q1 = q2.qubit_product(q1)
-        >>> q2_q1
-        [0. 0. 1. 0.]
-        >>> q1_q2_q3 = q1.qubit_product(q2, q3)
-        >>> q1_q2_q3
-        [0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
-
-        '''
-        
-        if len(arg) == 0:
-            raise TypeError('Must specify at least one argument.')
-
-        for argument in arg:
-            if not isinstance(argument, type(Qubit())):
-                raise TypeError('Arguments must be Qubit() objects.')
-
-        product_state = self.__state
-            
-        for argument in arg:
-            product_state = np.kron(product_state, argument.state())
-            
-        return Qubit(product_state)
 
     
 class Gate:
@@ -479,3 +447,37 @@ class Gate:
 
         else:
             return str(self.__state)
+
+
+def _is_listlike(potential_vector):
+    if (type(potential_vector) != list
+        and type(potential_vector) != tuple
+        and (not isinstance(potential_vector, type(np.array([0]))))):
+            return False
+    else:
+        return True
+
+
+def _has_only_numeric_elements(potential_vector):
+
+    for element in potential_vector:
+        try:
+            element + 5
+        except:
+            return False
+
+    return True
+
+def _is_normalizable(some_vector):
+
+    if all(element == 0 for element in some_vector):
+        return False
+    else:
+        return True
+
+def _length_is_power_of_two(some_vector):
+
+    if not sqerr._is_power_2(len(some_vector)) or len(some_vector) == 1:
+        return False
+    else:
+        return True
