@@ -59,17 +59,30 @@ class QubitValidInput(unittest.TestCase):
             norm_query = cmath.isclose(1, inner_product, rel_tol=10*mach_eps)
             self.assertTrue(norm_query)
 
-    def test_known_qubit_product(self):
+    def test_qubit_product_one_arg(self):
         '''
-        Verifies proper result for ``Qubit.qubit_product()``.
+        Verifies proper result for one arg in ``Qubit.qubit_product()``.
         '''
 
-        product_state_01 = np.array([0, 1, 0, 0])
+        expected_product = np.array([0, 1, 0, 0])
         q1 = sq.Qubit([0, 1])
-        test_product_state_01 = self.test_qubit.qubit_product(q1)
+        actual_product = self.test_qubit.qubit_product(q1)
 
-        np.testing.assert_array_equal(product_state_01, test_product_state_01.state())
+        np.testing.assert_array_equal(actual_product.state(), expected_product)
 
+    def test_qubit_product_two_args(self):
+        '''
+        Verifies proper results for two args in ``Qubit.qubit_product()``.
+        '''
+
+        expected_product = np.zeros(8, dtype=np.cdouble)
+        expected_product[0] = -1j
+
+        initial_state = sq.Qubit([1j, 0])
+        actual_product = initial_state.qubit_product(Qubit([1j, 0]), Qubit([1j, 0]))
+
+        np.testing.assert_array_equal(actual_product.state(), expected_product)
+        
     def test_computational_decomp_two_qubits(self):
         '''
         Checks that ``Qubit.computational_decomp()`` is correct for a Bell pair.

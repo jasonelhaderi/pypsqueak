@@ -46,9 +46,9 @@ class Qubit:
     '''
 
     def __init__(self, init_state = [1, 0]):
-        self.__state = None
-        self.__computational_decomp = None
         
+        self.__state = None
+        self.__computational_decomp = None     
         self.change_state(init_state)
 
     def __validate_state(self, some_vector):
@@ -81,6 +81,7 @@ class Qubit:
             The Qubit instance on which ``change_state()`` is called is
             altered.
         '''
+        
         self.__validate_state(new_state)
 
         # Changes the state.
@@ -114,20 +115,25 @@ class Qubit:
         return copy.deepcopy(self.__computational_decomp)
 
     def __normalize(self):
+        
         dual_state = np.conjugate(self.__state)
         norm = np.sqrt(np.dot(self.__state, dual_state))
         self.__state = np.multiply(1/norm, self.__state)
         self.__decompose_into_comp_basis()
 
     def __decompose_into_comp_basis(self):
-        # Generates a dict with basis state labels as keys and amplitudes as values
+        '''
+        Generates a dict with basis state labels as keys and amplitudes as values.
+        The result is stored internally.
+        '''
+        
         self.__computational_decomp = {}
         number_of_qubits = len(self)
 
         # Loop over self.__state since we need each basis state amplitude.
-        for basis_index in range(0, len(self.__state)):
-            basis_label = self.__convert_to_binary_string(basis_index, number_of_qubits)
-            amplitude = self.__state[basis_index]
+        for basis_state in range(0, len(self.__state)):
+            basis_label = self.__convert_to_binary_string(basis_state, number_of_qubits)
+            amplitude = self.__state[basis_state]
             self.__computational_decomp[basis_label] = amplitude
 
     def __is_listlike(self, potential_vector):
@@ -140,6 +146,7 @@ class Qubit:
 
 
     def __has_only_numeric_elements(self, potential_vector):
+        
         for element in potential_vector:
             try:
                 element + 5
@@ -149,48 +156,64 @@ class Qubit:
         return True
 
     def __is_normalizable(self, some_vector):
+        
         if all(element == 0 for element in some_vector):
             return False
         else:
             return True
 
     def __length_is_power_of_two(self, some_vector):
+        
         if not sqerr._is_power_2(len(some_vector)) or len(some_vector) == 1:
             return False
         else:
             return True
 
     def __convert_to_binary_string(self, number, length):
-        # Returns ``number`` as a binary string with length ``length``, filling in zeros.
+        '''
+        Returns ``number`` as a binary string with length ``length``,
+        filling in leading zeros if necessary.
+        '''
+        
         return format(number, 'b').zfill(length)
             
     def __len__(self):
-        # The number of qubits that the given Qubit corresponds to, not the number of components its vector representation has.
+        '''
+        The number of qubits that the given Qubit corresponds to,
+        not the number of components its vector representation has.
+        '''
+        
         return int(np.log2(len(self.__state)))
 
     def __repr__(self):
+        
         return "Qubit({})".format(repr(self.__state))
 
     def __str__(self):
-        # Generates a string representation of the state in the computational basis.
-        state_rep = ""
-        for state_label in self.__computational_decomp:
-            if self.__computational_decomp[state_label] == 0 + 0j:
+        '''
+        Generates a string representation of the state in the computational basis.
+        '''
+        
+        string_representation = ""
+        
+        for basis_state_label in self.__computational_decomp:
+            if self.__computational_decomp[basis_state_label] == 0 + 0j:
                 continue
-            elif len(state_rep) == 0:
-                state_rep += self.__make_basis_term_string_rep(
-                    self.__computational_decomp[state_label],
-                    state_label
+            elif len(string_representation) == 0:
+                string_representation += self.__make_basis_term_string_rep(
+                    self.__computational_decomp[basis_state_label],
+                    basis_state_label
                 )
             else:
-                state_rep += " + " + self.__make_basis_term_string_rep(
-                    self.__computational_decomp[state_label],
-                    state_label
+                string_representation += " + " + self.__make_basis_term_string_rep(
+                    self.__computational_decomp[basis_state_label],
+                    basis_state_label
                 )
 
-        return state_rep
+        return string_representation
 
     def __make_basis_term_string_rep(self, amplitude, basis_state_label):
+        
         if not isinstance(amplitude, complex):
             term_rep = "({:.2e})|{}>".format(amplitude, basis_state_label)
         elif amplitude == 0 + 0j:
@@ -243,30 +266,29 @@ class Qubit:
         [0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
 
         '''
+        
         if len(arg) == 0:
             raise TypeError('Must specify at least one argument.')
-        new_qubits = self.__state
 
         for argument in arg:
             if not isinstance(argument, type(Qubit())):
                 raise TypeError('Arguments must be Qubit() objects.')
 
-        if len(arg) == 1:
-            new_qubits = np.kron(new_qubits, arg[0].state())
-            return Qubit(new_qubits)
+        product_state = self.__state
+            
+        for argument in arg:
+            product_state = np.kron(product_state, argument.state())
+            
+        return Qubit(product_state)
 
-        if len(arg) > 1:
-            for argument in arg:
-                new_qubits = np.kron(new_qubits, argument.state())
-            return Qubit(new_qubits)
-
+    
 class Gate:
     '''
     A ``Gate`` is a variable-sized (shape is a tuple of powers of two), unitary
     matrix. Its state (returned by ``state()``) is a two-dimensional numpy array
     consisting of the computational basis representation of the quantum
     gate. By default it is initialized to the one qubit identity gate, but this
-    can be overridded if the ``Gate`` is instantiated with some other numeric matrix
+    can be overridden if the ``Gate`` is instantiated with some other numeric matrix
     as argument. If the matrix argument is not unitary, the ``Gate`` will fail
     to initialize. Additionally, the gate can be given a name via the
     the corresponding kwarg. If not provided, defaults to ``None``.
