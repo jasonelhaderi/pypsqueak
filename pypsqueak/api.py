@@ -519,39 +519,10 @@ class qOp:
     '''
 
     def __init__(self, matrix_rep=[[1, 0], [0, 1]], kraus_ops=None):
-        self.__validate_matrix_rep(matrix_rep)
         self.__state = Gate(matrix_rep)
 
         self.__validate_kraus_ops(kraus_ops)
         self.__noise_model = kraus_ops
-
-    def __validate_matrix_rep(self, matrix_rep):
-        # Checks that input is list-like, square matrix
-        try:
-            n_cols = len(matrix_rep)
-            n_rows = len(matrix_rep[0])
-            if n_rows != n_cols:
-                raise TypeError('Input must be a square matrix.')
-            for row in matrix_rep:
-                if len(row) != n_cols:
-                    raise TypeError('Input must be a square matrix.')
-                for element in row:
-                    try:
-                        element + 5
-                    except:
-                        raise TypeError('Elements of matrix_rep must be numeric.')
-        except:
-            raise TypeError('Input must be matrix-like.')
-
-        # Checks that the input has valid dimensions
-        if not sqerr._is_power_2(len(matrix_rep)) or len(matrix_rep) < 2:
-            raise sqerr.WrongShapeError('matrix_rep must be nXn with n > 1 a power of 2.')
-
-        # Checks that the input is unitary
-        product_with_conj = np.dot(np.asarray(matrix_rep).T.conj(), matrix_rep)
-        is_unitary = np.allclose(product_with_conj, np.eye(len(matrix_rep)))
-        if is_unitary == False:
-            raise sqerr.NonUnitaryInputError('matrix_rep must be unitary.')
 
 
     def __validate_kraus_ops(self, kraus_ops):

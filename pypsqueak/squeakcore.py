@@ -166,7 +166,7 @@ class Qubit:
         if not _is_normalizable(some_vector):
             raise sqerr.NullVectorError('State cannot be the null vector.')
 
-        if not _length_is_power_of_two(some_vector):
+        if not _is_power_of_two(len(some_vector)) or len(some_vector) == 1:
             raise sqerr.WrongShapeError('Input state must have a length > 1 which is a power of 2.')
     
     def __normalize(self):
@@ -301,8 +301,8 @@ class Gate:
         else:
             raise TypeError('Input matrix must be a numeric nxn matrix (made of nested lists, tuples, or as an numpy array).')
             
-        if not sqerr._is_power_2(self.__shape[0]) or self.__shape[0] == 1:
-            raise sqerr.WrongShapeError('Gate must be nXn with n > 1 a power of 2.')
+        if not _is_power_of_two(self.__shape[0]) or self.__shape[0] == 1:
+            raise TypeError('Gate must be nXn with n > 1 a power of 2.')
 
         # Checks that the name (if any) is a string
         if not isinstance(name, str) and not isinstance(name, type(None)):
@@ -425,6 +425,9 @@ class Gate:
             column_length = len(some_matrix)
         except TypeError:
             return False
+
+        if len(some_matrix) == 0:
+            return False
         
         for row in some_matrix:
             if (not _is_listlike(row)
@@ -477,9 +480,16 @@ def _is_normalizable(some_vector):
     else:
         return True
 
-def _length_is_power_of_two(some_vector):
+def _is_power_of_two(n):
 
-    if not sqerr._is_power_2(len(some_vector)) or len(some_vector) == 1:
+    if not n == int(n):
         return False
-    else:
+
+    n = int(n)
+    if n == 1:
         return True
+    elif n >= 2:
+        return _is_power_of_two(n/2.0)
+    else:
+        return False
+

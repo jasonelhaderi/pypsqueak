@@ -328,6 +328,24 @@ class qOpFailure(unittest.TestCase):
         for matrix in bad_matricies:
             self.assertRaises(TypeError, sq.qOp, matrix)
 
+    def test_non_square_matrix_rep(self):
+        '''
+        ``qOp`` throws a ``TypeError`` if the ``matrix_rep`` is not square.
+        '''
+
+        non_square_matrix = [[0, 1], [2, 3], [3, 4]]
+
+        self.assertRaises(TypeError, sq.qOp, non_square_matrix)
+
+    def test_square_matrix_not_a_power_of_2(self):
+        '''
+        ``qOp`` throws a ``TypeError`` if the ``matrix_rep`` is square but not a power of two.
+        '''
+
+        non_square_matrix = [[0, 1, 2], [2, 3, 3], [3, 4, 5]]
+
+        self.assertRaises(TypeError, sq.qOp, non_square_matrix)
+            
     def test_duplicate_q_reg_locs(self):
         '''
         The ``qOp.on()`` method must fail when duplicate target qubits are

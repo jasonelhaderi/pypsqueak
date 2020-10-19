@@ -192,7 +192,7 @@ class QubitInvalidInput(unittest.TestCase):
 
     def test_wrong_length(self):
         '''
-        ``Qubit.change_state()`` should fail for a vector with length that isn't a power of 2.
+        ``Qubit.change_state()`` should fail for a vector with length that isn't a power of 2 > 1.
         '''
 
         wrong_length = [[0, 1, 34],
@@ -275,6 +275,13 @@ class GateInvalidInput(unittest.TestCase):
         for matrix in bad_matricies:
             self.assertRaises(TypeError, sq.Gate, matrix)
 
+    def test_empty_list_input(self):
+        '''
+        ``Gate`` should fail to initialize with the empty list as an input.
+        '''
+
+        self.assertRaises(TypeError, sq.Gate, [])
+            
     def test_not_square(self):
         '''
         ``Gate`` should throw ``TypeError`` if input matrix doesn't have shape ``(n, n)``.
@@ -300,7 +307,7 @@ class GateInvalidInput(unittest.TestCase):
                         [0, 1, 0],
                         [0, 0, 1]]
 
-        self.assertRaises(sqerr.WrongShapeError, sq.Gate, uneven_shape)
+        self.assertRaises(TypeError, sq.Gate, uneven_shape)
 
     def test_not_unitary(self):
         '''
