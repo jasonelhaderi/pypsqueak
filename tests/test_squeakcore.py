@@ -277,7 +277,7 @@ class GateInvalidInput(unittest.TestCase):
 
     def test_not_square(self):
         '''
-        ``Gate`` should fail to initialize if input doesn't have shape ``(n, n)``.
+        ``Gate`` should throw ``TypeError`` if input matrix doesn't have shape ``(n, n)``.
         '''
 
         wrong_shapes = [[[]],
@@ -289,7 +289,7 @@ class GateInvalidInput(unittest.TestCase):
                          ([1, 2],
                           (1, 2, 3))]
         for candidate in wrong_shapes:
-            self.assertRaises(sqerr.WrongShapeError, sq.Gate, candidate)
+            self.assertRaises(TypeError, sq.Gate, candidate)
 
     def test_not_power_2(self):
         '''

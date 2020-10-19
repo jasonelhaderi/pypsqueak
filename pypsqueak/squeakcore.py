@@ -296,24 +296,13 @@ class Gate:
 
     def __init__(self, some_matrix = [(1, 0), (0, 1)], name = None):
         
-        if not _is_listlike(some_matrix):
-            raise TypeError('Input must be list, tuple, or numpy array.')
-
-        for row in some_matrix:
-            if not _is_listlike(row):
-                raise TypeError('Input must be matrix-like (list-like of list-likes).')
-            elif not _has_only_numeric_elements(row):
-                raise TypeError("Elements of input matrix rows must be numeric.")
-
-
-        # Checks that the input is a square matrix
-        self.__shape = (len(some_matrix), len(some_matrix[0]))
+        if self._is_numeric_square_matrix(some_matrix):
+            self.__shape = (len(some_matrix), len(some_matrix[0]))
+        else:
+            raise TypeError('Input matrix must be a numeric nxn matrix (made of nested lists, tuples, or as an numpy array).')
+            
         if not sqerr._is_power_2(self.__shape[0]) or self.__shape[0] == 1:
             raise sqerr.WrongShapeError('Gate must be nXn with n > 1 a power of 2.')
-
-        for row in some_matrix:
-            if len(row) != self.__shape[0]:
-                raise sqerr.WrongShapeError('Input not a square matrix.')
 
         # Checks that the name (if any) is a string
         if not isinstance(name, str) and not isinstance(name, type(None)):
@@ -428,6 +417,23 @@ class Gate:
             for argument in arg:
                 new_gate = np.kron(new_gate, argument.state())
             return Gate(new_gate)
+
+    @staticmethod
+    def _is_numeric_square_matrix(some_matrix):
+
+        try:
+            column_length = len(some_matrix)
+        except TypeError:
+            return False
+        
+        for row in some_matrix:
+            if (not _is_listlike(row)
+                or not _has_only_numeric_elements(row)
+                or (len(row) != column_length)):
+                
+                return False
+            
+        return True   
 
     def __len__(self):
         # Note that this returns the number of qubits the gate acts on, NOT the
