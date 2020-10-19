@@ -295,32 +295,14 @@ class Gate:
     '''
 
     def __init__(self, some_matrix = [(1, 0), (0, 1)], name = None):
-        
-        if self._is_numeric_square_matrix(some_matrix):
-            self.__shape = (len(some_matrix), len(some_matrix[0]))
-        else:
-            raise TypeError('Input matrix must be a numeric nxn matrix (made of nested lists, tuples, or as an numpy array).')
-            
-        if not _is_power_of_two(self.__shape[0]) or self.__shape[0] == 1:
-            raise TypeError('Gate must be nXn with n > 1 a power of 2.')
 
-        # Checks that the name (if any) is a string
-        if not isinstance(name, str) and not isinstance(name, type(None)):
-            raise TypeError('Name of Gate (if any) must be str.')
-
-        # Initialize the gate
+        self.__validate_gate(some_matrix, name)
         self.__state = np.array(some_matrix)
+        
         if name == None:
             self.__name = str(self.__state)
-
-        if name != None:
+        else:
             self.__name = name
-
-        # Checks that the input is unitary
-        product_with_conj = np.dot(self.__state.conj().T, self.__state)
-        is_unitary = np.allclose(product_with_conj, np.eye(self.__shape[0]))
-        if is_unitary == False:
-            raise sqerr.NonUnitaryInputError('Gate must be unitary.')
 
     def state(self):
         '''
@@ -436,8 +418,38 @@ class Gate:
                 
                 return False
             
-        return True   
+        return True
 
+    def _is_unitary(self, some_matrix):
+
+        if not self._is_numeric_square_matrix(some_matrix):
+            return False
+
+        product_with_hermitian_conjugate = np.dot(
+                np.array(some_matrix).conj().T,
+                some_matrix
+            )
+
+        if not np.allclose(
+                product_with_hermitian_conjugate,
+                np.eye(len(some_matrix))):
+            return False
+        else:
+            return True
+
+    def __validate_gate(self, potential_gate, gate_name):
+        if self._is_unitary(potential_gate):
+            self.__shape = (len(potential_gate), len(potential_gate[0]))
+        else:
+            raise TypeError('Input matrix must be a numeric, unitary nxn matrix (made of nested lists, tuples, or as an numpy array).')
+            
+        if not _is_power_of_two(self.__shape[0]) or self.__shape[0] == 1:
+            raise TypeError('Gate must be nXn with n > 1 a power of 2.')
+
+        # Checks that the name (if any) is a string
+        if not isinstance(gate_name, str) and not isinstance(gate_name, type(None)):
+            raise TypeError('Name of Gate (if any) must be str.')
+    
     def __len__(self):
         # Note that this returns the number of qubits the gate acts on, NOT the
         # size of matrix representation

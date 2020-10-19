@@ -244,7 +244,7 @@ class qOpFailure(unittest.TestCase):
 
         non_unitary_matricies = [M1, M2, M3, M4]
         for matrix in non_unitary_matricies:
-            self.assertRaises(sqerr.NonUnitaryInputError, sq.qOp, matrix)
+            self.assertRaises(TypeError, sq.qOp, matrix)
 
     def test_bad_noise_input(self):
         '''

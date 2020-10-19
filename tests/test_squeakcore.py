@@ -327,7 +327,7 @@ class GateInvalidInput(unittest.TestCase):
 
         non_unitary_matricies = [M1, M2, M3, M4]
         for matrix in non_unitary_matricies:
-            self.assertRaises(sqerr.NonUnitaryInputError, sq.Gate, matrix)
+            self.assertRaises(TypeError, sq.Gate, matrix)
 
 class GateProductValidInput(unittest.TestCase):
 
