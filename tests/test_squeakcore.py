@@ -5,11 +5,10 @@ import cmath
 
 # pypSQUEAK modules
 from pypsqueak.squeakcore import Qubit, Gate
-import pypsqueak.api as sq
-import pypsqueak.errors as sqerr
+from pypsqueak.errors import WrongShapeError, NullVectorError
+
 
 # Qubit Tests
-
 class QubitValidInput(unittest.TestCase):
     valid_qubits = [[1.0, 0],
                     [0.0, 1],
@@ -23,7 +22,7 @@ class QubitValidInput(unittest.TestCase):
                     np.array([1.0, 0])]
 
     def setUp(self):
-        self.test_qubit = sq.Qubit()
+        self.test_qubit = Qubit()
 
     def test_change_and_initialize_equiv(self):
         '''
@@ -65,7 +64,7 @@ class QubitValidInput(unittest.TestCase):
         '''
 
         expected_product = np.array([0, 1, 0, 0])
-        q1 = sq.Qubit([0, 1])
+        q1 = Qubit([0, 1])
         actual_product = self.test_qubit.qubit_product(q1)
 
         np.testing.assert_array_equal(actual_product.state(), expected_product)
@@ -78,7 +77,7 @@ class QubitValidInput(unittest.TestCase):
         expected_product = np.zeros(8, dtype=np.cdouble)
         expected_product[0] = -1j
 
-        initial_state = sq.Qubit([1j, 0])
+        initial_state = Qubit([1j, 0])
         actual_product = initial_state.qubit_product(Qubit([1j, 0]), Qubit([1j, 0]))
 
         np.testing.assert_array_equal(actual_product.state(), expected_product)
@@ -88,7 +87,7 @@ class QubitValidInput(unittest.TestCase):
         Checks that ``Qubit.computational_decomp()`` is correct for a Bell pair.
         '''
 
-        bell_pair = sq.Qubit([1, 0, 0, 1])
+        bell_pair = Qubit([1, 0, 0, 1])
         expected_decomposition = {
             '00': 1/np.sqrt(2),
             '01': 0,
@@ -103,7 +102,7 @@ class QubitValidInput(unittest.TestCase):
         Checks that ``Qubit.computational_decomp()`` is correct for a three qubit state.
         '''
 
-        bell_pair = sq.Qubit([1, 0, 1, 0, 0, 0, 0, 1])
+        bell_pair = Qubit([1, 0, 1, 0, 0, 0, 0, 1])
         expected_decomposition = {
             '000': 1/np.sqrt(3),
             '001': 0,
@@ -122,7 +121,7 @@ class QubitValidInput(unittest.TestCase):
         Checks that ``str(Qubit)`` is correct for a Bell state.
         '''
 
-        bell_pair = sq.Qubit([1, 0, 0, -1])
+        bell_pair = Qubit([1, 0, 0, -1])
         expected_rep = '(7.07e-01)|00> + (-7.07e-01)|11>'
 
         self.assertEqual(expected_rep, str(bell_pair))
@@ -132,7 +131,7 @@ class QubitValidInput(unittest.TestCase):
         Checks that ``str(Qubit)`` is correct for a state with a negative first term.
         '''
 
-        qubit = sq.Qubit([-1, 0, 0, 0, 0, 0, 2, 1])
+        qubit = Qubit([-1, 0, 0, 0, 0, 0, 2, 1])
         expected_rep = '(-4.08e-01)|000> + (8.16e-01)|110> + (4.08e-01)|111>'
 
         self.assertEqual(expected_rep, str(qubit))
@@ -141,7 +140,7 @@ class QubitValidInput(unittest.TestCase):
         '''
         Checks that ``str(Qubit)`` is correct for a state with a term other than the first negative.
         '''
-        qubit = sq.Qubit([1, 0, 0, 0, 0, 0, -2, 1])
+        qubit = Qubit([1, 0, 0, 0, 0, 0, -2, 1])
         expected_rep = '(4.08e-01)|000> + (-8.16e-01)|110> + (4.08e-01)|111>'
 
         self.assertEqual(expected_rep, str(qubit))
@@ -151,7 +150,7 @@ class QubitValidInput(unittest.TestCase):
         Checks that ``str(Qubit)`` is correct for a state with a complex term.
         '''
 
-        qubit = sq.Qubit([1 - 1j, 1j])
+        qubit = Qubit([1 - 1j, 1j])
         expected_rep = '(5.77e-01-5.77e-01j)|0> + (5.77e-01j)|1>'
 
         self.assertEqual(expected_rep, str(qubit))
@@ -159,7 +158,7 @@ class QubitValidInput(unittest.TestCase):
 class QubitInvalidInput(unittest.TestCase):
 
     def setUp(self):
-        self.test_qubit = sq.Qubit()
+        self.test_qubit = Qubit()
 
     def test_not_list_or_tuple(self):
         '''
@@ -198,7 +197,7 @@ class QubitInvalidInput(unittest.TestCase):
         wrong_length = [[0, 1, 34],
                         [7]]
         for candidate in wrong_length:
-            self.assertRaises(sqerr.WrongShapeError, self.test_qubit.change_state, candidate)
+            self.assertRaises(WrongShapeError, self.test_qubit.change_state, candidate)
 
     def test_zero_vector(self):
         '''
@@ -210,14 +209,14 @@ class QubitInvalidInput(unittest.TestCase):
                         ()]
 
         for null_vec in null_vectors:
-            self.assertRaises(sqerr.NullVectorError, self.test_qubit.change_state, null_vec)
+            self.assertRaises(NullVectorError, self.test_qubit.change_state, null_vec)
 
     def test_empty_input_qubit_product(self):
         '''
         ``Qubit.qubit_product()`` with empty argument should raise a ``TypeError``.
         '''
 
-        self.assertRaises(TypeError, sq.Qubit().qubit_product)
+        self.assertRaises(TypeError, Qubit().qubit_product)
 
 # Gate tests
 
@@ -234,10 +233,10 @@ class GateValidInput(unittest.TestCase):
     valid_gates = [X, Y, Z, I]
 
     def setUp(self):
-        self.gate_x = sq.Gate(self.X)
-        self.gate_y = sq.Gate(self.Y)
-        self.gate_z = sq.Gate(self.Z.tolist())
-        self.gate_i = sq.Gate()
+        self.gate_x = Gate(self.X)
+        self.gate_y = Gate(self.Y)
+        self.gate_z = Gate(self.Z.tolist())
+        self.gate_i = Gate()
 
     def test_pauli_gates(self):
         '''
@@ -263,7 +262,7 @@ class GateInvalidInput(unittest.TestCase):
                             None]
 
         for candidate in not_list_of_rows:
-            self.assertRaises(TypeError, sq.Gate, candidate)
+            self.assertRaises(TypeError, Gate, candidate)
 
     def test_non_numeric_elements(self):
         '''
@@ -273,14 +272,14 @@ class GateInvalidInput(unittest.TestCase):
         bad_matricies = [[[np.array([3, 4]), 6],[1, -1j]], (('item', 3), (3, 5))]
 
         for matrix in bad_matricies:
-            self.assertRaises(TypeError, sq.Gate, matrix)
+            self.assertRaises(TypeError, Gate, matrix)
 
     def test_empty_list_input(self):
         '''
         ``Gate`` should fail to initialize with the empty list as an input.
         '''
 
-        self.assertRaises(TypeError, sq.Gate, [])
+        self.assertRaises(TypeError, Gate, [])
             
     def test_not_square(self):
         '''
@@ -296,7 +295,7 @@ class GateInvalidInput(unittest.TestCase):
                          ([1, 2],
                           (1, 2, 3))]
         for candidate in wrong_shapes:
-            self.assertRaises(TypeError, sq.Gate, candidate)
+            self.assertRaises(TypeError, Gate, candidate)
 
     def test_not_power_2(self):
         '''
@@ -307,7 +306,7 @@ class GateInvalidInput(unittest.TestCase):
                         [0, 1, 0],
                         [0, 0, 1]]
 
-        self.assertRaises(TypeError, sq.Gate, uneven_shape)
+        self.assertRaises(TypeError, Gate, uneven_shape)
 
     def test_not_unitary(self):
         '''
@@ -327,7 +326,7 @@ class GateInvalidInput(unittest.TestCase):
 
         non_unitary_matricies = [M1, M2, M3, M4]
         for matrix in non_unitary_matricies:
-            self.assertRaises(TypeError, sq.Gate, matrix)
+            self.assertRaises(TypeError, Gate, matrix)
 
 class GateProductValidInput(unittest.TestCase):
 
@@ -337,16 +336,16 @@ class GateProductValidInput(unittest.TestCase):
         with one arg.
         '''
 
-        gate_i = sq.Gate()
-        gate_z = sq.Gate([[1, 0],
+        gate_i = Gate()
+        gate_z = Gate([[1, 0],
                           [0, -1]])
         gate_i_prod_i = gate_i.gate_product(gate_i)
         gate_i_prod_z = gate_i.gate_product(gate_z)
-        gate_i_squared = sq.Gate([[1, 0, 0, 0],
+        gate_i_squared = Gate([[1, 0, 0, 0],
                                   [0, 1, 0, 0],
                                   [0, 0, 1, 0],
                                   [0, 0, 0, 1]])
-        gate_i_times_z = sq.Gate([[1, 0, 0, 0],
+        gate_i_times_z = Gate([[1, 0, 0, 0],
                                   [0, -1, 0, 0],
                                   [0, 0, 1, 0],
                                   [0, 0, 0, -1]])
@@ -361,7 +360,7 @@ class GateProductValidInput(unittest.TestCase):
         ``Gate.gate_product()`` should return ``self`` with no arguments.
         '''
 
-        gate_z = sq.Gate([[1, 0],
+        gate_z = Gate([[1, 0],
                           [0, -1]])
         gate_empty_arg = gate_z.gate_product()
 
@@ -372,9 +371,9 @@ class GateProductValidInput(unittest.TestCase):
         Checks that the tensor product of two identities with identity works.
         '''
 
-        gate_i = sq.Gate()
+        gate_i = Gate()
         gate_i_cubed = gate_i.gate_product(gate_i, gate_i)
-        gate_should_equal = sq.Gate(np.eye(8))
+        gate_should_equal = Gate(np.eye(8))
 
         np.testing.assert_array_equal(gate_i_cubed.state(), gate_should_equal.state())
 
@@ -388,7 +387,8 @@ class GateProductInvalidInput(unittest.TestCase):
         not_gates = [2, 16, [1, 2], [[1, 2], [2, 3]], []]
 
         for candidate in not_gates:
-            self.assertRaises(TypeError, sq.Gate().gate_product, candidate)
+            self.assertRaises(TypeError, Gate().gate_product, candidate)
+
 
 if __name__ == '__main__':
     unittest.main()

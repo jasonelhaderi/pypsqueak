@@ -1,13 +1,14 @@
 # Standard modules
 import unittest
 import numpy as np
-import cmath
 import copy
 
 # pypSQUEAK modules
-import pypsqueak.gates as gt
+# import pypsqueak.gates as gt
+from pypsqueak.gates import I, X, Z, H, CNOT
 import pypsqueak.api as sq
 import pypsqueak.errors as sqerr
+
 
 class qRegSuccess(unittest.TestCase):
 
@@ -27,13 +28,13 @@ class qRegSuccess(unittest.TestCase):
 
         # Measure |01> correctly
         self.test_reg += 1
-        gt.X.on(self.test_reg, 0)
+        X.on(self.test_reg, 0)
         self.assertEqual(1, self.test_reg.measure(0))
         np.testing.assert_array_equal(np.array([0, 1, 0, 0]), self.test_reg.dump_state())
 
         # Now let's measure the observable X on the superposition state (|00> - |01>)/sqrt(2)
-        gt.H.on(self.test_reg, 0)
-        self.assertEqual(-1, self.test_reg.measure_observable(gt.I.kron(gt.X)))
+        H.on(self.test_reg, 0)
+        self.assertEqual(-1, self.test_reg.measure_observable(I.kron(X)))
 
     def test_no_target_size_match(self):
         '''
@@ -51,9 +52,9 @@ class qRegSuccess(unittest.TestCase):
 
         # Make the state 1/sqrt(2) (|100> + |101>) and then measure
         # I (x) I (x) X.
-        gt.X.on(self.test_reg, 2)
-        gt.H.on(self.test_reg, 0)
-        result = self.test_reg.measure_observable(gt.X)
+        X.on(self.test_reg, 2)
+        H.on(self.test_reg, 0)
+        result = self.test_reg.measure_observable(X)
 
         state_hadamard = np.zeros(8)
         state_hadamard[4] = 1/np.sqrt(2)
@@ -68,14 +69,14 @@ class qRegSuccess(unittest.TestCase):
         '''
 
         temp_reg = sq.qReg()
-        gt.X.on(temp_reg)
+        X.on(temp_reg)
         temp_reg += 1
         self.test_reg *= temp_reg
         state_001 = np.array([0, 1, 0, 0, 0, 0, 0, 0])
         np.testing.assert_array_equal(state_001, self.test_reg.dump_state())
 
         temp_reg = sq.qReg()
-        gt.X.on(temp_reg)
+        X.on(temp_reg)
         a_new_reg = self.test_reg * temp_reg
         state_0011 = np.zeros(16)
         state_0011[3] = 1
@@ -119,7 +120,7 @@ class qRegFailure(unittest.TestCase):
 
         # Multiplication operation dereferences register.
         a = sq.qReg()
-        gt.X.on(a)
+        X.on(a)
         b = sq.qReg()
         c = a * b
         d = sq.qReg()
@@ -136,14 +137,14 @@ class qRegFailure(unittest.TestCase):
             # Checks that the dereferenced register is fully dead (i.e. all methods
             # called with or on it raise an exception.
             self.assertRaises(sqerr.IllegalRegisterReference, register.measure, 0)
-            self.assertRaises(sqerr.IllegalRegisterReference, register.measure_observable, gt.Z)
+            self.assertRaises(sqerr.IllegalRegisterReference, register.measure_observable, Z)
             self.assertRaises(sqerr.IllegalRegisterReference, register.peek)
             self.assertRaises(sqerr.IllegalRegisterReference, register.dump_state)
             self.assertRaises(sqerr.IllegalRegisterReference, register.__iadd__, 1)
             self.assertRaises(sqerr.IllegalRegisterReference, register.__mul__, sq.qReg())
             self.assertRaises(sqerr.IllegalRegisterReference, register.__imul__, sq.qReg())
             self.assertRaises(sqerr.IllegalRegisterReference, len, register)
-            self.assertRaises(sqerr.IllegalRegisterReference, gt.X.on, register, 0)
+            self.assertRaises(sqerr.IllegalRegisterReference, X.on, register, 0)
 
     def test_bad_measurement_index(self):
         '''
@@ -186,19 +187,19 @@ class qOpSuccess(unittest.TestCase):
         test_results = []
         # Takes |0> to |1>
         some_reg = sq.qReg()
-        gt.X.on(some_reg)
+        X.on(some_reg)
         test_results.append(some_reg.dump_state())
 
         # Takes |0> to |0001>
         some_reg = sq.qReg()
-        gt.X.on(some_reg)
-        gt.I.on(some_reg, 3)
+        X.on(some_reg)
+        I.on(some_reg, 3)
         test_results.append(some_reg.dump_state())
 
         # Takes |0> to (1/sqrt(2))(|000> - |100>)
         some_reg = sq.qReg()
-        gt.X.on(some_reg, 2)
-        gt.H.on(some_reg, 2)
+        X.on(some_reg, 2)
+        H.on(some_reg, 2)
         test_results.append(some_reg.dump_state())
 
         expected_results = [np.array([0, 1]),
@@ -214,7 +215,7 @@ class qOpSuccess(unittest.TestCase):
         qubits in the |0> state.
         '''
 
-        gt.I.on(self.test_reg, 2)
+        I.on(self.test_reg, 2)
         state_000 = np.array([1, 0, 0, 0, 0, 0, 0, 0])
         np.testing.assert_array_equal(state_000, self.test_reg.dump_state())
 
@@ -353,7 +354,7 @@ class qOpFailure(unittest.TestCase):
         '''
 
         self.test_reg += 1
-        self.assertRaises(ValueError, gt.CNOT.on, self.test_reg, 1, 1)
+        self.assertRaises(ValueError, CNOT.on, self.test_reg, 1, 1)
 
     def test_gate_and_reg_mismatch(self):
         '''
@@ -366,7 +367,7 @@ class qOpFailure(unittest.TestCase):
 
         self.test_reg += 1
         # Too few
-        self.assertRaises(sqerr.WrongShapeError, gt.CNOT.on, self.test_reg, 1)
+        self.assertRaises(sqerr.WrongShapeError, CNOT.on, self.test_reg, 1)
 
     def test_known_swaps(self):
         '''
@@ -374,7 +375,7 @@ class qOpFailure(unittest.TestCase):
         '''
 
         # Verify that |100> gets swapped to |001>
-        gt.X.on(self.test_reg, 2)
+        X.on(self.test_reg, 2)
         swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg, 2)
         state_100 = np.zeros(8)
         state_100[1] = 1
@@ -389,8 +390,8 @@ class qOpFailure(unittest.TestCase):
         # Verify that (|010> - |011>)/sqrt(2) gets swapped to (|100> - |101>)/sqrt(2)
         # with targets 0, 2 and 0, 2, 1
         for i in range(len(self.test_reg)):
-            gt.X.on(self.test_reg, i)
-        gt.H.on(self.test_reg, 0)
+            X.on(self.test_reg, i)
+        H.on(self.test_reg, 0)
         swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg, 0, 2)
         np.testing.assert_array_equal(swap, self.test_op._qOp__generate_swap(self.test_reg, 0, 2, 1)[0])
         np.testing.assert_array_equal(swap, self.test_op._qOp__generate_swap(self.test_reg, 0, 2)[1])

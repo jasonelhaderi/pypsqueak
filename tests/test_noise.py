@@ -1,20 +1,20 @@
 # Standard modules
 import unittest
 import numpy as np
-import cmath
 
 # pypSQUEAK modules
-import pypsqueak.api as sq
-import pypsqueak.errors as sqerr
+from pypsqueak.api import qReg, qOp
+from pypsqueak.errors import NormalizationError, WrongShapeError
 from pypsqueak.noise import damping_map, depolarization_map, b_flip_map
+
 
 class NoiseInstructionInvalidInput(unittest.TestCase):
 
     def setUp(self):
         # Test register
-        self.test_reg = sq.qReg()
+        self.test_reg = qReg()
         # Test op
-        self.test_op = sq.qOp()
+        self.test_op = qOp()
 
     def test_kraus_ops_not_list(self):
         '''
@@ -46,7 +46,7 @@ class NoiseInstructionInvalidInput(unittest.TestCase):
 
         bad_kraus = [np.zeros((5, 2)), np.zeros((3, 17))]
 
-        self.assertRaises(sqerr.WrongShapeError, self.test_op.set_noise_model, bad_kraus)
+        self.assertRaises(WrongShapeError, self.test_op.set_noise_model, bad_kraus)
 
     def test_wrong_number_kraus(self):
         '''
@@ -62,9 +62,9 @@ class NoiseInstructionInvalidInput(unittest.TestCase):
         match the dimensions of the ``qOp`` when calling ``qOp.set_noise_model()``.
         '''
 
-        size_of_two = sq.qOp().kron(sq.qOp())
+        size_of_two = qOp().kron(qOp())
 
-        self.assertRaises(sqerr.WrongShapeError, size_of_two.set_noise_model, damping_map(0.5))
+        self.assertRaises(WrongShapeError, size_of_two.set_noise_model, damping_map(0.5))
 
     def test_kraus_ops_incomplete(self):
         '''
@@ -78,7 +78,7 @@ class NoiseInstructionInvalidInput(unittest.TestCase):
         bad_kraus_maps.append([b_flip_map(1.0)[0], depolarization_map(0.5)[0]])
 
         for bad_kraus in bad_kraus_maps:
-            self.assertRaises(sqerr.NormalizationError,\
+            self.assertRaises(NormalizationError,\
                               self.test_op.set_noise_model, kraus_ops=bad_kraus)
 
 if __name__ == '__main__':
