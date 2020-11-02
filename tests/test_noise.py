@@ -81,5 +81,6 @@ class NoiseInstructionInvalidInput(unittest.TestCase):
             self.assertRaises(NormalizationError,\
                               self.test_op.set_noise_model, kraus_ops=bad_kraus)
 
+
 if __name__ == '__main__':
     unittest.main()

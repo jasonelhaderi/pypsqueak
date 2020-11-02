@@ -5,7 +5,7 @@ backend of pypSQUEAK.
 
 import numpy as np
 import copy
-import pypsqueak.errors as sqerr
+from pypsqueak.errors import NullVectorError, WrongShapeError
 
 
 class Qubit:
@@ -158,18 +158,18 @@ class Qubit:
 
     def __validate_state(self, some_vector):
         if not _is_listlike(some_vector):
-            raise TypeError('''Input state must be a list,
-                               tuple, or numpy array.''')
+            raise TypeError("Input state must be a list, "
+                            "tuple, or numpy array.")
 
         if not _has_only_numeric_elements(some_vector):
             raise TypeError('Elements of input state must be numeric.')
 
         if not _is_normalizable(some_vector):
-            raise sqerr.NullVectorError('State cannot be the null vector.')
+            raise NullVectorError('State cannot be the null vector.')
 
         if not _is_power_of_two(len(some_vector)) or len(some_vector) == 1:
-            raise sqerr.WrongShapeError('''Input state must have a length > 1
-                                           which is a power of 2.''')
+            raise WrongShapeError("Input state must have a length > 1 "
+                                  "which is a power of 2.")
 
     def __normalize(self):
 
@@ -259,16 +259,16 @@ class Qubit:
 class Gate:
     '''
     A ``Gate`` is a variable-sized (shape is a tuple of powers of two), unitary
-    matrix. Its state (returned by ``state()``) is a two-dimensional numpy array
-    consisting of the computational basis representation of the quantum
+    matrix. Its state (returned by ``state()``) is a two-dimensional numpy
+    array consisting of the computational basis representation of the quantum
     gate. By default it is initialized to the one qubit identity gate, but this
-    can be overridden if the ``Gate`` is instantiated with some other numeric matrix
-    as argument. If the matrix argument is not unitary, the ``Gate`` will fail
-    to initialize. Additionally, the gate can be given a name via the
-    the corresponding kwarg. If not provided, defaults to ``None``.
+    can be overridden if the ``Gate`` is instantiated with some other
+    numeric matrix as argument. If the matrix argument is not unitary, the
+    ``Gate`` will fail to initialize. Additionally, the gate can be given a
+    name via the corresponding kwarg. If not provided, defaults to ``None``.
 
-    Note that ``len(some_gate)`` returns the number of qubits that ``some_gate``
-    acts on (``log2(some_gate.shape()[0])``)
+    Note that ``len(some_gate)`` returns the number of qubits that
+    ``some_gate`` acts on (``log2(some_gate.shape()[0])``)
 
     Examples
     --------
@@ -305,7 +305,7 @@ class Gate:
         self.__validate_gate(some_matrix, name)
         self.__state = np.array(some_matrix)
 
-        if name == None:
+        if name is None:
             self.__name = str(self.__state)
         else:
             self.__name = name
@@ -352,14 +352,15 @@ class Gate:
         Note that this method does NOT have side-effects; it simply returns the
         product as a new Gate object.
 
-        Returns the Kronecker product of a ``Gate`` with one or more other ``Gate``s.
+        Returns the Kronecker product of a ``Gate`` with one or more other
+        ``Gate``s.
 
         When multiple arguments are specified, the product is computed
         sequentially from the leftmost argument to the rightmost.
 
         Parameters
         ----------
-        \*arg : pypsqueak.squeakcore.Gate
+        *arg : pypsqueak.squeakcore.Gate
             One or more ``Gate`` objects. Raises an exception if called with
             no arguments.
 
@@ -390,6 +391,7 @@ class Gate:
         '''
 
         new_gate = self.__state
+
         if len(arg) == 0:
             return Gate(new_gate)
 
@@ -397,14 +399,9 @@ class Gate:
             if not isinstance(argument, type(Gate())):
                 raise TypeError('Arguments must be Gate() objects.')
 
-        if len(arg) == 1:
-            new_gate = np.kron(new_gate, arg[0].state())
-            return Gate(new_gate)
-
-        if len(arg) > 1:
-            for argument in arg:
-                new_gate = np.kron(new_gate, argument.state())
-            return Gate(new_gate)
+        for argument in arg:
+            new_gate = np.kron(new_gate, argument.state())
+        return Gate(new_gate)
 
     @staticmethod
     def _is_numeric_square_matrix(some_matrix):
@@ -433,8 +430,7 @@ class Gate:
 
         product_with_hermitian_conjugate = np.dot(
             np.array(some_matrix).conj().T,
-            some_matrix
-        )
+            some_matrix)
 
         if not np.allclose(
                 product_with_hermitian_conjugate,
@@ -447,14 +443,15 @@ class Gate:
         if self._is_unitary(potential_gate):
             self.__shape = (len(potential_gate), len(potential_gate[0]))
         else:
-            raise TypeError(
-                'Input matrix must be a numeric, unitary nxn matrix (made of nested lists, tuples, or as an numpy array).')
+            raise TypeError("Input matrix must be a numeric, "
+                            "unitary nxn matrix (madeof nested lists, "
+                            "tuples, or as an numpy array).")
 
         if not _is_power_of_two(self.__shape[0]) or self.__shape[0] == 1:
             raise TypeError('Gate must be nXn with n > 1 a power of 2.')
 
-        # Checks that the name (if any) is a string
-        if not isinstance(gate_name, str) and not isinstance(gate_name, type(None)):
+        if (not isinstance(gate_name, str)
+                and not isinstance(gate_name, type(None))):
             raise TypeError('Name of Gate (if any) must be str.')
 
     def __len__(self):
@@ -463,7 +460,7 @@ class Gate:
         return int(np.log2(self.__shape[0]))
 
     def __repr__(self):
-        if self.__name != None:
+        if self.__name is not None:
             return self.__name
 
         else:
@@ -487,7 +484,7 @@ def _has_only_numeric_elements(obj):
         else:
             try:
                 element + 5
-            except:
+            except TypeError:
                 return False
 
     return True
