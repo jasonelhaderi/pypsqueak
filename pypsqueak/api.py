@@ -1,36 +1,40 @@
 '''
-Front end of pypSQUEAK. Contains definitions of ``qReg``, ``qOp``, and ``qOracle``
-classes which provide abstract representations of quantum hardware.
+Front end of pypSQUEAK. Contains definitions of ``qReg``, ``qOp``, and
+``qOracle`` classes which provide abstract representations of quantum hardware.
 '''
 import numpy as np
-import copy
 import cmath
 
 from pypsqueak.squeakcore import Qubit, Gate
-import pypsqueak.errors as sqerr
+from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
+                              NormalizationError, WrongShapeError)
+
 
 class qReg:
     '''
-    A high-level primitive which provides users with a means of interfacing with
-    a quantum device (simulated in this implementation).
+    A high-level primitive which provides users with a means of interfacing
+    with a quantum device (simulated in this implementation).
 
-    A ``qReg`` is a high-level primitive which provides users with a representation
-    of a quantum register. In this implementation, the quantum device on which
-    the register exists is simulated via a ``pypsqueak.squeakcore.Qubit`` object.
-    Like the underlying ``Qubit``, a ``qReg`` is initialized in the |0> state. This can be
-    overridden if the ``qReg`` is instead instantiated with some other numeric vector
-    as argument (the resulting ``qReg`` will use a normalized version of
-    that vector).
+    A ``qReg`` is a high-level primitive which provides users with a
+    representation of a quantum register. In this implementation, the quantum
+    device on which the register exists is simulated via a
+    ``pypsqueak.squeakcore.Qubit`` object.
+
+    Like the underlying ``Qubit``, a ``qReg`` is initialized in the |0> state.
+    This can be overridden if the ``qReg`` is instead instantiated with some
+    other numeric vector as argument (the resulting ``qReg`` will use a
+    normalized version of that vector).
 
     As per the no-cloning theorem, any attempt to copy a ``qReg`` object will
     throw an exception. Additionally, operations which would otherwise leave
-    duplicates of a specific instance of a ``qReg`` lying around dereference the
-    register. Once a ``qReg`` is dereferenced, any attempt to interact with the
-    ``qReg`` will throw an exception.
+    duplicates of a specific instance of a ``qReg`` lying around dereference
+    the register. Once a ``qReg`` is dereferenced, any attempt to interact with
+    the ``qReg`` will throw an exception.
 
-    Since this implementation uses simulated quantum hardware, methods for examining
-    the quantum state as a Dirac ket and returning the state as a numpy array are
-    provided. They are ``qReg.peek()`` and ``qReg.dump_state()``, respectively.
+    Since this implementation uses simulated quantum hardware, methods for
+    examining the quantum state as a Dirac ket and returning the state as a
+    numpy array are provided. They are ``qReg.peek()`` and
+    ``qReg.dump_state()``, respectively.
 
     Examples
     --------
@@ -52,15 +56,16 @@ class qReg:
     >>> a.peek()
     '(1.00e+00)|000>'
 
-    A couple of quick notes are in order. Observe that new ``qReg`` instances are
-    initialized to the zero state of the computational basis. Additionally,
+    A couple of quick notes are in order. Observe that new ``qReg`` instances
+    are initialized to the zero state of the computational basis. Additionally,
     different instances of a ``qReg`` are considered unequal even if the
-    underlying state is the same. Lastly, when ``qOp.on()`` is applied to a target
-    in a ``qReg`` that is outside the range of the register, new filler qubits
-    are automatically initialzed in the zero state.
+    underlying state is the same. Lastly, when ``qOp.on()`` is applied to a
+    target in a ``qReg`` that is outside the range of the register, new filler
+    qubits are automatically initialzed in the zero state.
 
-    Now we demonstrate which operators are overloaded for ``qReg`` objects as well
-    as their behavior. We can append any number of qubits to a ``qReg`` like so:
+    Now we demonstrate which operators are overloaded for ``qReg`` objects as
+    well as their behavior. We can append any number of qubits to a ``qReg``
+    like so:
 
     >>> from pypsqueak.gates import X
     >>> a = qReg(1)
@@ -69,8 +74,8 @@ class qReg:
     >>> a.peek()
     '(1.00e+00)|00010>'
 
-    Two registers can be joined into one via the tensor product. This can be done
-    in place:
+    Two registers can be joined into one via the tensor product. This can be
+    done in place:
 
     >>> a *= qReg(2)
     >>> a.peek()
@@ -93,13 +98,14 @@ class qReg:
         File "<stdin>", line 1, in <module>
         File "pypsqueak/api.py", line 199, in peek
 
-    pypsqueak.errors.IllegalRegisterReference: Dereferenced register encountered.
+    pypsqueak.errors.IllegalRegisterReference: Dereferenced register
+    encountered.
 
-    Notice that taking the product of ``qReg`` objects dereferences any operands.
-
+    Notice that taking the product of ``qReg`` objects dereferences any
+    operands.
     '''
 
-    def __init__(self, n_qubits = 1):
+    def __init__(self, n_qubits=1):
         if n_qubits < 1:
             raise ValueError("A qReg must have length of at least 1.")
 
@@ -110,8 +116,8 @@ class qReg:
 
     def measure(self, target):
         '''
-        Performs a projective measurement on the qubit at the address ``target``.
-        In this simulated implementation, there are three steps:
+        Performs a projective measurement on the qubit at the address
+        ``target``. In this simulated implementation, there are three steps:
 
         #. Compute probability of each measurement using the amplitudes of each
            basis vector in the computational basis decomposition.
@@ -121,18 +127,21 @@ class qReg:
         Parameters
         ----------
         target : int
-            The index of the qubit in the ``qReg`` to measure. An exception gets
+            The index of the qubit in the ``qReg`` to measure. An exception
+            gets
             thrown if the value is negative or out of range.
 
         Returns
         -------
         int
             Either a one or a zero, depending on the result of the measurement.
-            The state of the ``qReg`` is projected onto the corresponding subspace.
+            The state of the ``qReg`` is projected onto the corresponding
+            subspace.
 
         Examples
         --------
-        Here we prepare the Bell state and then measure qubit one in the ``qReg``.
+        Here we prepare the Bell state and then measure qubit one in the
+        ``qReg``.
 
         >>> from pypsqueak.api import qReg
         >>> from pypsqueak.gates import CNOT, H
@@ -149,13 +158,16 @@ class qReg:
         '''
 
         if self.__killed:
-            raise sqerr.IllegalRegisterReference('Measurement attempted on dereferenced register.')
+            raise IllegalRegisterReference('Measurement attempted on '
+                                                 'dereferenced register.')
 
         if not isinstance(target, int) or target < 0:
-            raise IndexError('Quantum register address must be nonnegative integer.')
+            raise IndexError('Quantum register address must be nonnegative '
+                             'integer.')
 
         if target > len(self) - 1:
-            raise IndexError('Specified quantum register address out of range.')
+            raise IndexError('Specified quantum register address out of '
+                             'range.')
 
         # We use the relative amplitudes |0> or |1> measurements to generate
         # corresponding probability weights.
@@ -185,7 +197,8 @@ class qReg:
         prob_total = prob_for_zero + prob_for_one
         mach_eps = np.finfo(type(prob_total)).eps
         if not cmath.isclose(prob_total, 1, rel_tol=10*mach_eps):
-            raise sqerr.NormalizationError('Sum over outcome probabilities = {}.'.format(prob_total))
+            raise NormalizationError(
+                'Sum over outcome probabilities = {}.'.format(prob_total))
 
         measurement = np.random.choice(2, p=[prob_for_zero, prob_for_one])
 
@@ -203,15 +216,17 @@ class qReg:
 
         projector_operator = np.diag(projector_diag)
         new_state = np.dot(projector_operator, self.__q_reg.state())
-        # Note that the change_state() method automatically normalizes new_state
+        # Note that the change_state() method automatically normalizes
+        # new_state.
         self.__q_reg.change_state(new_state)
 
         return measurement
 
     def measure_observable(self, observable):
         '''
-        Performs a projective measurement of the ``observable`` corresponding to a
-        ``qOp``. In this simulated implementation, four steps are involved:
+        Performs a projective measurement of the ``observable`` corresponding
+        to a ``qOp``. In this simulated implementation, four steps are
+        involved:
 
         #. Determine measurement outcomes.
         #. Compute probability of each measurement using the amplitudes of each
@@ -222,8 +237,9 @@ class qReg:
         Parameters
         ----------
         observable : pypsqueak.api.qOp
-            The ``qOp`` corresponding to some observable to measure. An exception gets
-            thrown if its size larger than the size of the ``qReg``.
+            The ``qOp`` corresponding to some observable to measure. An
+            exception gets thrown if its size larger than the size of the
+            ``qReg``.
 
         Returns
         -------
@@ -253,7 +269,7 @@ class qReg:
             raise TypeError("Argument of measure_observable() must be a qOp.")
 
         if len(self) < observable.size():
-            raise sqerr.WrongShapeError("Observable larger than qReg.")
+            raise WrongShapeError("Observable larger than qReg.")
 
         if len(self) > observable.size():
             diff = len(self) - observable.size()
@@ -271,14 +287,15 @@ class qReg:
             probabilities.append(amplitude * amplitude.conj())
 
         # Choose measurement result
-        measurement_index = np.random.choice([i for i in range(len(e_vals))], p=probabilities)
+        measurement_index = np.random.choice(
+            [i for i in range(len(e_vals))], p=probabilities)
         measurement_result = e_vals[measurement_index]
 
         # Build subspace corresponding to eigenvalue
         subspace_basis = []
         for i in range(len(e_vals)):
             if e_vals[i] == measurement_result:
-                subspace_basis.append(e_vecs[:,i])
+                subspace_basis.append(e_vecs[:, i])
 
         # Make projection operator
         projector = np.outer(subspace_basis[0], subspace_basis[0])
@@ -313,8 +330,8 @@ class qReg:
         >>> a.peek()
         '(7.07e-01)|000> + (7.07e-01)|001>'
 
-        After dereferencing the register via a multiplication, calling ``peek()`` raises an
-        exception:
+        After dereferencing the register via a multiplication, calling
+        ``peek()`` raises an exception:
 
         >>> a * qReg()
         qReg(4)
@@ -322,28 +339,31 @@ class qReg:
         Traceback (most recent call last):
             File "<stdin>", line 1, in <module>
             File "pypsqueak/api.py", line 309, in peek
-                raise sqerr.IllegalRegisterReference('Dereferenced register encountered.')
-        pypsqueak.errors.IllegalRegisterReference: Dereferenced register encountered.
+                raise IllegalRegisterReference('Dereferenced register '
+                                                     'encountered.')
+        pypsqueak.errors.IllegalRegisterReference: Dereferenced register
+        encountered.
 
         '''
 
         if self.__killed:
-            raise sqerr.IllegalRegisterReference('Dereferenced register encountered.')
+            raise IllegalRegisterReference('Dereferenced register '
+                                                 'encountered.')
 
         return str(self.__q_reg)
 
     def dump_state(self):
-
         '''
-        Returns a copy of the state of a ``qReg`` as a numpy array. Note that this
-        is impossible on hardware implementations as a consequence of the
+        Returns a copy of the state of a ``qReg`` as a numpy array. Note that
+        this is impossible on hardware implementations as a consequence of the
         no-cloning theorem. If the register has been dereferenced, raises an
         exception.
 
         Returns
         -------
         numpy.ndarray
-            The state of ``qReg`` as a vector in the computational basis. Has no side effects.
+            The state of ``qReg`` as a vector in the computational basis. Has
+            no side effects.
 
         Examples
         --------
@@ -357,8 +377,8 @@ class qReg:
         array([0.70710678, 0.70710678, 0.        , 0.        , 0.        ,
                0.        , 0.        , 0.        ])
 
-        Now we dereference the ``qReg`` and run into an exception when we try to
-        dump its state again:
+        Now we dereference the ``qReg`` and run into an exception when we try
+        to dump its state again:
 
         >>> a * qReg()
         qReg(4)
@@ -367,12 +387,14 @@ class qReg:
             File "<stdin>", line 1, in <module>
             File "pypsqueak/api.py", line 342, in dump_state
             exception.
-        pypsqueak.errors.IllegalRegisterReference: Dereferenced register encountered.
+        pypsqueak.errors.IllegalRegisterReference: Dereferenced register
+        encountered.
 
         '''
 
         if self.__killed:
-            raise sqerr.IllegalRegisterReference('Dereferenced register encountered.')
+            raise IllegalRegisterReference('Dereferenced register '
+                                                 'encountered.')
 
         return self.__q_reg.state()
 
@@ -382,10 +404,12 @@ class qReg:
         '''
 
         if self.__killed:
-            raise sqerr.IllegalRegisterReference('Attempt to add Qubits to dereferenced register.')
+            raise IllegalRegisterReference('Attempt to add Qubits to '
+                                                 'dereferenced register.')
 
         if not isinstance(n_new_qubits, int) or n_new_qubits < 0:
-            raise ValueError("Can only add a positive integer number of qubits to quantumRegister.")
+            raise ValueError("Can only add a positive integer number of "
+                             "qubits to quantumRegister.")
 
         new_register = Qubit()
         for i in range(n_new_qubits - 1):
@@ -401,7 +425,8 @@ class qReg:
         |a_reg>|some_reg> into ``a_reg``).
         '''
         if self.__killed or some_reg.__killed:
-            raise sqerr.IllegalRegisterReference('Concatentation attempted on dereferenced register.')
+            raise IllegalRegisterReference(
+                'Concatentation attempted on dereferenced register.')
 
         if not isinstance(some_reg, type(qReg())):
             raise ValueError("Cannot concatentate a qReg to a non-qReg.")
@@ -419,7 +444,8 @@ class qReg:
         '''
 
         if self.__killed or another_reg.__killed:
-            raise sqerr.IllegalRegisterReference('Concatentation attempted on dereferenced register.')
+            raise IllegalRegisterReference(
+                'Concatentation attempted on dereferenced register.')
 
         new_register = qReg()
         new_state = self.__q_reg.qubit_product(another_reg._qReg__q_reg)
@@ -433,15 +459,16 @@ class qReg:
 
     def __len__(self):
         if self.__killed:
-            raise sqerr.IllegalRegisterReference('Dereferenced register encountered.')
+            raise IllegalRegisterReference(
+                'Dereferenced register encountered.')
 
         return len(self.__q_reg)
 
     def __copy__(self):
-        raise sqerr.IllegalCopyAttempt('Cannot copy a qReg.')
+        raise IllegalCopyAttempt('Cannot copy a qReg.')
 
     def __deepcopy__(self, memo):
-        raise sqerr.IllegalCopyAttempt('Cannot copy a qReg.')
+        raise IllegalCopyAttempt('Cannot copy a qReg.')
 
     def __repr__(self):
         if not self.__killed:
@@ -449,23 +476,24 @@ class qReg:
         else:
             return "Dereferenced qReg"
 
+
 class qOp:
-
     '''
-    A high-level primitive for representing unitary gates. In this implementation,
-    noise can be simulated by instantiating a ``qOp`` with the kwarg ``kraus_ops``,
-    a list of operation elements characterizing a noisy quantum operation.
-    A high-level primitive which provides users with a means of interfacing with
-    a quantum device (simulated in this implementation).
+    A high-level primitive for representing unitary gates. In this
+    implementation, noise can be simulated by instantiating a ``qOp`` with the
+    kwarg ``kraus_ops``, a list of operation elements characterizing a noisy
+    quantum operation. A high-level primitive which provides users with a means
+    of interfacing with a quantum device (simulated in this implementation).
 
-    A ``qOp`` is a high-level primitive which provides users with a representation
-    of a quantum gate. In this implementation, the hardware of the gate is simulated
-    with a ``pypsqueak.squeakcore.Gate`` object. Like the underlying
-    ``Gate``, a ``qOp`` is by default a unitary operation. When instantiated
-    with no aguments, the resulting ``qOp`` is the identity. Other operations
-    can be represented by using a matrix representation of the operator as a
-    creation argument. Additionally, noise can be modeled by providing a list of
-    the the operation elements (as ``numpy.ndarray``s) characterizing said noise.
+    A ``qOp`` is a high-level primitive which provides users with a
+    representation of a quantum gate. In this implementation, the hardware of
+    the gate is simulated with a ``pypsqueak.squeakcore.Gate`` object. Like the
+    underlying ``Gate``, a ``qOp`` is by default a unitary operation. When
+    instantiated with no aguments, the resulting ``qOp`` is the identity. Other
+    operations can be represented by using a matrix representation of the
+    operator as a creation argument. Additionally, noise can be modeled by
+    providing a list of the the operation elements (as ``numpy.ndarray``s)
+    characterizing said noise.
 
     Examples
     --------
@@ -476,7 +504,8 @@ class qOp:
     >>> p_y = qOp([[0, -1j], [1j, 0]])
     >>> p_z = qOp([[1, 0], [0, -1]])
 
-    The multiplication operator is overloaded to implement matrix multiplication:
+    The multiplication operator is overloaded to implement matrix
+    multiplication:
 
     >>> p_x * p_x
     [[1 0]
@@ -502,8 +531,8 @@ class qOp:
     >>> q.peek()
     '(1.00e+00)|1>'
 
-    We can define a function with return type ``qOp`` to implement parameterized
-    gates:
+    We can define a function with return type ``qOp`` to implement
+    parameterized gates:
 
     >>> import numpy as np
     >>> def rot_x(theta):
@@ -535,16 +564,19 @@ class qOp:
             if not isinstance(kraus_ops, list):
                 raise TypeError("kraus_ops must be a list of matricies.")
             if len(kraus_ops) < 2:
-                raise TypeError("Must specify at least two Kraus operators for a quantum op.")
+                raise TypeError("Must specify at least two Kraus operators "
+                                "for a quantum op.")
 
             # Check that each element of kraus_ops is a ndarray
             if not all(isinstance(op, type(np.array([]))) for op in kraus_ops):
-                raise TypeError("Each operator in kraus_ops must be a numpy array.")
+                raise TypeError("Each operator in kraus_ops must be a numpy "
+                                "array.")
 
             # Check that each operator in kraus_ops has the correct shape.
             kraus_shape = kraus_ops[0].shape
             if kraus_shape[0] != kraus_shape[1]:
-                raise sqerr.WrongShapeError("Kraus operators must be square matricies.")
+                raise WrongShapeError("Kraus operators must be square "
+                                            "matrices.")
 
             # Check that kraus_ops are trace-preserving
             identity = np.identity(kraus_shape[0])
@@ -553,34 +585,40 @@ class qOp:
                 sum += np.matmul(np.conjugate(kraus_ops[i].T), kraus_ops[i])
 
             if not np.allclose(sum, identity):
-                raise sqerr.NormalizationError("Kraus operators must be trace-preserving.")
+                raise NormalizationError("Kraus operators must be "
+                                               "trace-preserving.")
 
             for op in kraus_ops:
                 if op.shape != kraus_shape:
-                    raise sqerr.WrongShapeError("All Kraus operators must have same shape.")
+                    raise WrongShapeError("All Kraus operators must "
+                                                "have same shape.")
                 for row in op:
                     try:
                         len(row)
-                    except:
-                        raise TypeError("Rows of kraus_ops matricies must be list-like.")
+                    except TypeError:
+                        raise TypeError("Rows of kraus_ops matricies must be "
+                                        "list-like.")
                     for element in row:
                         try:
                             element + 5
-                        except:
-                            raise TypeError("Elements of kraus_ops matricies must be numeric.")
+                        except TypeError:
+                            raise TypeError("Elements of kraus_ops matricies "
+                                            "must be numeric.")
             gate_shape = self.__state.shape()
             if gate_shape != kraus_shape:
-                raise sqerr.WrongShapeError("Size mismatch between Kraus operators and gate.")
+                raise WrongShapeError("Size mismatch between Kraus "
+                                            "operators and gate.")
 
     def set_noise_model(self, kraus_ops):
         '''
         Changes the noise model on the ``qOp`` to that specified by the list
-        of numpy ndarrays ``kraus_ops``. Each element in this list must have the
-        same dimensions, match the size of the ``qOp``, and collectively be
+        of numpy ndarrays ``kraus_ops``. Each element in this list must have
+        the same dimensions, match the size of the ``qOp``, and collectively be
         trace-preserving.
 
-        By defualt ``kraus_ops = None``. The ``qOp`` is then noiselessly emulated. Note that
-        this method would be absent from a hardware implementation of SQUEAK.
+        By defualt ``kraus_ops = None``. The ``qOp`` is then noiselessly
+        emulated. Note that this method would be absent from a hardware
+        implementation of SQUEAK.
 
         Parameters
         ----------
@@ -591,10 +629,10 @@ class qOp:
 
         Examples
         --------
-        If we want to model a noisy single-qubit channel, we can instantiate an identity
-        operator with the corresponding noise. Let's make a channel exhibiting a bit
-        flip noise with probability 0.5 of a flip, and then send a qubit in the |0>
-        state through it 1000 times:
+        If we want to model a noisy single-qubit channel, we can instantiate
+        an identity operator with the corresponding noise. Let's make a
+        channel exhibiting a bit flip noise with probability 0.5 of a flip,
+        and then send a qubit in the |0> state through it 1000 times:
 
         >>> from pypsqueak.api import qReg, qOp
         >>> from pypsqueak.noise import b_flip_map
@@ -656,29 +694,30 @@ class qOp:
         '''
         Applies a ``qOp`` to a ``qReg``. If the size of the ``qOp`` agrees with
         the size of the ``qReg``, no target qubits are required. If the ``qOp``
-        is smaller than the ``qReg``, the ``qOp`` is lifted to the higher-dimensional
-        Hilbert space of the ``qReg``. In that case, n target qubits must be,
-        specified, where n is the size of the ``qOp`` before lifting. If the
-        size of the ``qOp`` is larger than the size of the ``qReg``, an
-        exception is raised.
+        is smaller than the ``qReg``, the ``qOp`` is lifted to the
+        higher-dimensional Hilbert space of the ``qReg``. In that case, n
+        target qubits must be, specified, where n is the size of the
+        ``qOp`` before lifting. If the size of the ``qOp`` is larger than the
+        size of the ``qReg``, an exception is raised.
 
         When the size of the ``qOp`` is smaller than the size of the ``qReg``,
         the ``targets`` specify how to order the qubits in the ``qReg``
         before application of the lifted operator (that is, the tensor product
-        I^n (x) ``qOp``, where n is the length of the ``qReg`` minus the size of
-        the ``qOp``). From left to right, the qubits named in the ``targets``
-        are swapped with the qubits at addresses zero, one, two, etc. All remaining
-        qubits get bumped up to the next highest available register addresses which
-        were NOT involved in the swap. After operation with the lifted ``qOp``,
-        the ``qReg`` is permuted back to its original ordering.
+        I^n (x) ``qOp``, where n is the length of the ``qReg`` minus the size
+        of the ``qOp``). From left to right, the qubits named in the
+        ``targets`` are swapped with the qubits at addresses zero, one, two,
+        etc. All remaining qubits get bumped up to the next highest available
+        register addresses which were NOT involved in the swap. After
+        operation with the lifted ``qOp``, the ``qReg`` is permuted back to
+        its original ordering.
 
         As an example, if a ``qReg`` is in the state |abcdef> and
         and ``qOp.on()`` is called with with ``targets`` = [3, 0, 4, 1], then
         the ``qReg`` is permuted to |adebfc> before application of the ``qOp``.
 
-        If the size of the ``qOp`` and ``qReg`` match, then calling ``qOp.on()``
-        with no targets skips permutation of the register before applying the
-        operator.
+        If the size of the ``qOp`` and ``qReg`` match, then calling
+        ``qOp.on()`` with no targets skips permutation of the register before
+        applying the operator.
 
         Parameters
         ----------
@@ -686,8 +725,8 @@ class qOp:
             The register to apply the operation to.
         *targets : int
             A list of locations in the register. The corresponding qubits are
-            permuted to the lowest positions in the register before application of
-            the operator. Must be nonnegative.
+            permuted to the lowest positions in the register before
+            application of the operator. Must be nonnegative.
 
         Returns
         -------
@@ -697,8 +736,8 @@ class qOp:
 
         Examples
         --------
-        Here we apply a controlled NOT gate to the state |01> both with and without
-        specifying targets:
+        Here we apply a controlled NOT gate to the state |01> both with and
+        without specifying targets:
 
         >>> from pypsqueak.api import qReg, qOp
         >>> from pypsqueak.gates import X, CNOT
@@ -716,64 +755,75 @@ class qOp:
         >>> q.peek()
         '(1.00e+00)|11>'
 
-        Since the controlled NOT is a two-qubit gate, an exception is raised when
-        we call it with only one target:
+        Since the controlled NOT is a two-qubit gate, an exception is raised
+        when we call it with only one target:
 
         >>> CNOT.on(q, 1)
         Traceback (most recent call last):
             File "<stdin>", line 1, in <module>
             File "pypsqueak/api.py", line 763, in on
-                # Check that the gate size matches the number of quantum_reg locations
-        pypsqueak.errors.WrongShapeError: Number of registers must match number of qubits gate operates on.
-
+        pypsqueak.errors.WrongShapeError: Number of registers must match number
+        of qubits gate operates on.
         '''
 
         if q_reg._qReg__killed:
-            raise sqerr.IllegalRegisterReference("Cannot operate on a dereferenced register.")
+            raise IllegalRegisterReference(
+                "Cannot operate on a dereferenced register.")
 
-        # Check that at least one quantum_reg location is specified when gate and register
-        # sizes don't match.
+        # Check that at least one quantum_reg location is specified when gate
+        # and register sizes don't match.
         if len(targets) == 0 and self.size() != len(q_reg):
-            raise IndexError('One or more targets must be specified for gate and register of different size.')
+            raise IndexError(
+                'One or more targets must be specified for gate and register '
+                'of different size.')
 
-        # Check that there are no duplicate register locations for the instruction
+        # Check that there are no duplicate register locations for the
+        # instruction
         if len(targets) != len(set(targets)):
-            raise ValueError('Specified quantum register targets must be unique.')
+            raise ValueError(
+                'Specified quantum register targets must be unique.')
 
         # Check that the gate size matches the number of quantum_reg locations
         if len(targets) != 0 and self.size() != len(targets):
-            raise sqerr.WrongShapeError('Number of registers must match number of qubits gate operates on.')
+            raise WrongShapeError(
+                'Number of registers must match number of qubits gate '
+                'operates on.')
 
         if len(targets) != 0:
             # Check that all the register locations are nonnegative integers
             for address in targets:
                 if not isinstance(address, int):
-                    raise IndexError('Quantum register addresses must be integer.')
+                    raise IndexError(
+                        'Quantum register addresses must be integer.')
 
                 if address < 0:
-                    raise IndexError('Quantum register addresses must be nonnegative.')
+                    raise IndexError(
+                        'Quantum register addresses must be nonnegative.')
 
-            # If any of the specified quantum_reg addresses have not yet been initialized,
-            # initialize them (as well as intermediate reg locs) in the |0> state
+            # If any of the specified quantum_reg addresses have not yet been
+            # initialized, initialize them (as well as intermediate reg locs)
+            # in the |0> state
             if max(targets) > len(q_reg) - 1:
                 q_reg += max(targets) - len(q_reg) + 1
 
         # Initialize an identity gate for later use.
         iden = Gate()
 
-        # If no targets are specified, __generate_swap() returns identity matricies.
+        # If no targets are specified, __generate_swap() returns identity
+        # matricies.
         swap, swap_inverse = self.__generate_swap(q_reg, *targets)
 
         before_swap_and_op = q_reg._qReg__q_reg.state()
         after_swap_before_op = np.dot(swap, before_swap_and_op)
 
-        # If the gate and size of the quantum register match, just operate with the gate
+        # If the gate and size of the quantum register match, just operate
+        # with the gate
         if len(q_reg) == self.size():
             operator = self.__state
 
-        # If the register size is larger, we need to raise the gate (I^n tensored with gate,
-        # since operational order means the target qubits are ordered into the lowest
-        # register adresses by this point).
+        # If the register size is larger, we need to raise the gate
+        # (I^n tensored with gate, since operational order means the target
+        # qubits are ordered into the lowest register adresses by this point).
         elif len(q_reg) > self.size():
             left_eye = iden
             for i in range(len(q_reg) - self.size() - 1):
@@ -781,20 +831,24 @@ class qOp:
 
             operator = left_eye.gate_product(self.__state)
 
-        # If no Kraus operators are specified, evaluation of new register state is trivial
-        if self.__noise_model == None:
-            after_swap_after_op = np.dot(operator.state(), after_swap_before_op)
+        # If no Kraus operators are specified, evaluation of new register state
+        # is trivial
+        if self.__noise_model is None:
+            after_swap_after_op = np.dot(
+                operator.state(),
+                after_swap_before_op)
 
         else:
             # We randomly choose one of the Kraus operators to apply, then we
-            # generate a corresponding gate to hand over to the __instr() method
+            # generate a corresponding gate to hand over to the __instr()
+            # method
             current_state = np.dot(operator.state(), after_swap_before_op)
             probs = []
             new_state_ensemble = []
 
-            # Generate an ensemble of states transformed according to Kraus ops in the
-            # form of a list of transformed state vector, and a corresponding
-            # list of probability weights for each tranformation
+            # Generate an ensemble of states transformed according to Kraus ops
+            # in the form of a list of transformed state vector, and a
+            # corresponding list of probability weights for each tranformation
             for op in self.__noise_model:
                 # Raise each operator if necessary
                 if len(q_reg) > np.log2(op.shape[0]):
@@ -809,7 +863,9 @@ class qOp:
                 probs.append(probability)
 
             # Pick one of the transformed states according to probs
-            new_state_index = np.random.choice([i for i in range(len(new_state_ensemble))], p=probs)
+            new_state_index = np.random.choice(
+                [i for i in range(len(new_state_ensemble))],
+                p=probs)
             after_swap_after_op = new_state_ensemble[new_state_index]
 
         new_reg_state = np.dot(swap_inverse, after_swap_after_op)
@@ -831,7 +887,8 @@ class qOp:
 
         # Check that the targets are valid.
         if len(q_reg) < max(targets):
-            raise IndexError("Uninitialized qubit referenced in swap operation.")
+            raise IndexError(
+                "Uninitialized qubit referenced in swap operation.")
 
         if not all(isinstance(target, int) for target in targets):
             raise IndexError("Noninteger index encountered.")
@@ -845,7 +902,7 @@ class qOp:
             new_order.append(target)
 
         for i in range(len(q_reg)):
-            if not i in new_order:
+            if i not in new_order:
                 new_order.append(i)
 
         # Use new_order to generate a corresponding permutation matrix.
@@ -854,10 +911,11 @@ class qOp:
             perm_matrix[i][new_order[i]] = 1
 
         swap_matrix = np.zeros((2**len(q_reg), 2**len(q_reg)))
-        # Iterate through each basis label, applying permutation matrix to generate
-        # new labels. Then, Convert old and new labels to ints. The unitary matrix
-        # implementing the desired qubit swap is given by U[new][old] = 1,
-        # for each transformed pair and has 0s everywhere else.
+        # Iterate through each basis label, applying permutation matrix to
+        # generate new labels. Then, Convert old and new labels to ints. The
+        # unitary matrix implementing the desired qubit swap is given by
+        # U[new][old] = 1, for each transformed pair and has 0s everywhere
+        # else.
         for basis_label in q_reg._qReg__q_reg.computational_decomp():
             old_label_vector = []
             for ch in basis_label[::-1]:
@@ -873,7 +931,9 @@ class qOp:
         swap_matrix_inverse = swap_matrix.T
 
         # Check that the transpose is the inverse.
-        if not np.array_equal(np.dot(swap_matrix, swap_matrix_inverse), np.eye(2**len(q_reg))):
+        if not np.array_equal(
+                np.dot(swap_matrix, swap_matrix_inverse),
+                np.eye(2**len(q_reg))):
             raise ValueError("Nonunitary swap encountered.")
 
         return swap_matrix, swap_matrix_inverse
@@ -899,7 +959,7 @@ class qOp:
         acting second. The resulting noise model is that of ``some_op``.
         '''
         if self.size() != another_op.size():
-            raise sqerr.WrongShapeError("qOp size mismatch.")
+            raise WrongShapeError("qOp size mismatch.")
 
         product = np.dot(another_op._qOp__state.state(), self.__state.state())
 
@@ -967,6 +1027,7 @@ class qOp:
 
         return str(self.__state)
 
+
 class qOracle(qOp):
     '''
     Subclass of ``qOp``. Useful for representing quantum black-boxes, such as
@@ -996,7 +1057,8 @@ class qOracle(qOp):
         # Check that the function values are valid.
         for value in [func(i) for i in range(2**n)]:
             if not isinstance(value, int):
-                raise TypeError('Range of input function contains non-integers.')
+                raise TypeError(
+                    'Range of input function contains non-integers.')
             if value < 0 or value > 2**m - 1:
                 raise ValueError('Range of input function out of bounds.')
 
@@ -1004,9 +1066,9 @@ class qOracle(qOp):
 
     def classical_func(self, x_val):
         '''
-        Returns the classical value of the function implemented by the ``qOracle``.
-        Raises an exception if the argument isn't nonnegative or if larger than
-        the ``n`` portion of the intended register.
+        Returns the classical value of the function implemented by the
+        ``qOracle``. Raises an exception if the argument isn't nonnegative or
+        if larger than the ``n`` portion of the intended register.
 
         Parameters
         ----------
@@ -1051,7 +1113,6 @@ class qOracle(qOp):
 
         dim = self.__range_exp + self.__domain_exp
         matrix_rep = np.zeros((2**dim, 2**dim))
-        f_vals = [i for i in range(2**self.__range_exp)]
         col = 0
         for x in range(2**self.__domain_exp):
             for y in range(2**self.__range_exp):

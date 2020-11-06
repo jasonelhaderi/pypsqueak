@@ -6,8 +6,6 @@ corresponds to a specific kind of one-qubit noise. For an example of usage, see
 
 import numpy as np
 
-from pypsqueak.squeakcore import Gate
-import pypsqueak.gates
 
 def damping_map(prob=0.1):
     '''
@@ -16,8 +14,8 @@ def damping_map(prob=0.1):
     Parameters
     ----------
     prob : numeric, between 0 and 1
-        Probability characterizing the likelihood of the outcomes represented by
-        the various Kraus operators.
+        Probability characterizing the likelihood of the outcomes represented
+        by the various Kraus operators.
 
     Returns
     -------
@@ -33,6 +31,7 @@ def damping_map(prob=0.1):
 
     return [static, decay]
 
+
 def depolarization_map(prob=0.1):
     '''
     Depolarizing channel.
@@ -40,8 +39,8 @@ def depolarization_map(prob=0.1):
     Parameters
     ----------
     prob : numeric, between 0 and 1
-        Probability characterizing the likelihood of the outcomes represented by
-        the various Kraus operators.
+        Probability characterizing the likelihood of the outcomes represented
+        by the various Kraus operators.
 
     Returns
     -------
@@ -61,6 +60,7 @@ def depolarization_map(prob=0.1):
 
     return [dep_i, dep_x, dep_y, dep_z]
 
+
 def phase_map(prob=0.1):
     '''
     Phase damping.
@@ -68,8 +68,8 @@ def phase_map(prob=0.1):
     Parameters
     ----------
     prob : numeric, between 0 and 1
-        Probability characterizing the likelihood of the outcomes represented by
-        the various Kraus operators.
+        Probability characterizing the likelihood of the outcomes represented
+        by the various Kraus operators.
 
     Returns
     -------
@@ -81,9 +81,10 @@ def phase_map(prob=0.1):
     phase_1 = np.array([[1, 0],
                         [0, np.sqrt(1 - prob)]])
     phase_2 = np.array([[0, 0],
-                      [0, np.sqrt(prob)]])
+                        [0, np.sqrt(prob)]])
 
     return [phase_1, phase_2]
+
 
 def p_flip_map(prob=0.1):
     '''
@@ -92,8 +93,8 @@ def p_flip_map(prob=0.1):
     Parameters
     ----------
     prob : numeric, between 0 and 1
-        Probability characterizing the likelihood of the outcomes represented by
-        the various Kraus operators.
+        Probability characterizing the likelihood of the outcomes represented
+        by the various Kraus operators.
 
     Returns
     -------
@@ -103,11 +104,12 @@ def p_flip_map(prob=0.1):
     '''
 
     static = np.sqrt(1 - prob) * np.array([[1, 0],
-                                       [0, 1]])
+                                           [0, 1]])
     flip = np.sqrt(prob) * np.array([[1, 0],
                                      [0, -1]])
 
     return [static, flip]
+
 
 def b_flip_map(prob=0.1):
     '''
@@ -116,8 +118,8 @@ def b_flip_map(prob=0.1):
     Parameters
     ----------
     prob : numeric, between 0 and 1
-        Probability characterizing the likelihood of the outcomes represented by
-        the various Kraus operators.
+        Probability characterizing the likelihood of the outcomes represented
+        by the various Kraus operators.
 
     Returns
     -------
@@ -133,6 +135,7 @@ def b_flip_map(prob=0.1):
 
     return [static, flip]
 
+
 def bp_flip_map(prob=0.1):
     '''
     Bit-phase flip.
@@ -140,8 +143,8 @@ def bp_flip_map(prob=0.1):
     Parameters
     ----------
     prob : numeric, between 0 and 1
-        Probability characterizing the likelihood of the outcomes represented by
-        the various Kraus operators.
+        Probability characterizing the likelihood of the outcomes represented
+        by the various Kraus operators.
 
     Returns
     -------

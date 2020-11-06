@@ -107,6 +107,23 @@ class qRegFailure(unittest.TestCase):
         self.assertRaises(IllegalCopyAttempt, copy.copy, self.test_reg)
         self.assertRaises(IllegalCopyAttempt, copy.deepcopy, self.test_reg)
 
+    def test_qReg_construction_fails_with_non_integer_creation_arg(self):
+        '''
+        Verifies that ``qReg`` initialization fails with non-integer
+        ``n_qubits``.
+        '''
+
+        self.assertRaises(TypeError, qReg, 1.1)
+
+    def test_qReg_construction_fails_with_creation_arg_less_than_one(self):
+        '''
+        Verifies that ``qReg`` initialization fails with ``n_qubits`` less than
+        one.
+        '''
+
+        self.assertRaises(ValueError, qReg, 0)
+        self.assertRaises(ValueError, qReg, -1)
+
     def test_mult_checks_both_regs_for_dereference(self):
         '''
         Verifies that multiplication checks whether both argument registers are

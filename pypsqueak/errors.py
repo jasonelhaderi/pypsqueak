@@ -5,17 +5,20 @@ class WrongShapeError(ValueError):
     '''
     pass
 
+
 class NullVectorError(ValueError):
     '''
     Raised when trying to initialize a ``Qubit`` with the null vector.
     '''
     pass
 
+
 class NormalizationError(ValueError):
     '''
     Raised when the normalization of a ``Qubit`` is broken.
     '''
     pass
+
 
 class NonUnitaryInputError(ValueError):
     '''
@@ -24,11 +27,13 @@ class NonUnitaryInputError(ValueError):
     '''
     pass
 
+
 class IllegalRegisterReference(NameError):
     '''
     Raised when any kind of operation is attempted on a killed qReg.
     '''
     pass
+
 
 class IllegalCopyAttempt(NotImplementedError):
     '''

@@ -10,9 +10,7 @@ functions returning a ``qOp`` object.
 '''
 
 import numpy as np
-import cmath
 
-from pypsqueak.squeakcore import Gate
 from pypsqueak.api import qOp
 
 # Pauli Gates
@@ -30,10 +28,12 @@ I = qOp()
 # Hadamard gate
 H = qOp([[1/np.sqrt(2), ((-1)**i) * 1/np.sqrt(2)] for i in range(2)])
 
+
 # PHASE gate
 def PHASE(theta=0):
     return qOp([[1, 0],
                 [0, np.exp(1j * theta)]])
+
 
 S = qOp([[1, 0],
          [0, 1j]])
@@ -41,18 +41,22 @@ S = qOp([[1, 0],
 T = qOp([[1, 0],
          [0, np.exp(1j * np.pi/4)]])
 
+
 # Rotation gates
 def ROT_X(theta=0):
     return qOp([[np.cos(theta/2.0), -1j*np.sin(theta/2.0)],
                 [-1j*np.sin(theta/2.0), np.cos(theta/2.0)]])
 
+
 def ROT_Y(theta=0):
     return qOp([[np.cos(theta/2.0), -np.sin(theta/2.0)],
                 [np.sin(theta/2.0), np.cos(theta/2.0)]])
 
+
 def ROT_Z(theta=0):
     return qOp([[np.exp(-1j * theta/2.0), 0],
                 [0, np.exp(1j * theta/2.0)]])
+
 
 # Two-qubit gates
 SWAP = qOp([[1, 0, 0, 0],
