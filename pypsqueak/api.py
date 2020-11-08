@@ -112,7 +112,7 @@ class qReg:
         init_state = [0 for i in range(2**n_qubits)]
         init_state[0] = 1
         self.__q_reg = Qubit(init_state)
-        self.__killed = False
+        self.__is_dereferenced = False
 
     def measure(self, target):
         '''
@@ -157,70 +157,13 @@ class qReg:
 
         '''
 
-        if self.__killed:
-            raise IllegalRegisterReference('Measurement attempted on '
-                                                 'dereferenced register.')
+        self._throwExceptionIfRequestedMeasurementIsNotValid(target)
+        measurement_outcome = np.random.choice(
+            2,
+            p=self._generateMeasurementOutcomeProbabilities(target))
+        self._collapseRegisterWavefunction(measurement_outcome, target)
 
-        if not isinstance(target, int) or target < 0:
-            raise IndexError('Quantum register address must be nonnegative '
-                             'integer.')
-
-        if target > len(self) - 1:
-            raise IndexError('Specified quantum register address out of '
-                             'range.')
-
-        # We use the relative amplitudes |0> or |1> measurements to generate
-        # corresponding probability weights.
-        amplitudes_for_zero = []
-        amplitudes_for_one = []
-
-        # Decompose the state into a dict of basis label and amplitude pairs.
-        basis_states = self.__q_reg.computational_decomp()
-        for state_label in basis_states:
-            if int(state_label[-1 - target]) == 0:
-                amplitudes_for_zero.append(basis_states[state_label])
-
-            if int(state_label[-1 - target]) == 1:
-                amplitudes_for_one.append(basis_states[state_label])
-
-        # We then use the sorted amplitudes to generate the probability weights
-        prob_for_zero = 0
-        prob_for_one = 0
-
-        for amplitude in amplitudes_for_zero:
-            prob_for_zero += amplitude * amplitude.conjugate()
-
-        for amplitude in amplitudes_for_one:
-            prob_for_one += amplitude * amplitude.conjugate()
-
-        # Check that total probability remains unity
-        prob_total = prob_for_zero + prob_for_one
-        mach_eps = np.finfo(type(prob_total)).eps
-        if not cmath.isclose(prob_total, 1, rel_tol=10*mach_eps):
-            raise NormalizationError(
-                'Sum over outcome probabilities = {}.'.format(prob_total))
-
-        measurement = np.random.choice(2, p=[prob_for_zero, prob_for_one])
-
-        # Next we project the state of q_reg onto the eigenbasis corresponding
-        # to the measurement result.
-        projector_diag = []
-        # If the qubit at address target in state_label == measurement, it is
-        # a part of the eigenbasis.
-        for state_label in basis_states:
-            if int(state_label[-1 - target]) == measurement:
-                projector_diag.append(1)
-
-            else:
-                projector_diag.append(0)
-
-        projector_operator = np.diag(projector_diag)
-        new_state = np.dot(projector_operator, self.__q_reg.state())
-        # Note that the change_state() method automatically normalizes
-        # new_state.
-        self.__q_reg.change_state(new_state)
-
-        return measurement
+        return measurement_outcome
 
     def measure_observable(self, observable):
         '''
@@ -346,9 +289,9 @@ class qReg:
 
         '''
 
-        if self.__killed:
+        if self.__is_dereferenced:
             raise IllegalRegisterReference('Dereferenced register '
-                                                 'encountered.')
+                                           'encountered.')
 
         return str(self.__q_reg)
 
@@ -392,20 +335,129 @@ class qReg:
 
         '''
 
-        if self.__killed:
+        if self.__is_dereferenced:
             raise IllegalRegisterReference('Dereferenced register '
-                                                 'encountered.')
+                                           'encountered.')
 
         return self.__q_reg.state()
+
+    def _throwExceptionIfRequestedMeasurementIsNotValid(self, target):
+        if self.__is_dereferenced:
+            raise IllegalRegisterReference('Measurement attempted on '
+                                           'dereferenced register.')
+
+        isTargetQubitIndexValid = (isinstance(target, int)
+                                   and target >= 0
+                                   and target < len(self))
+        if not isTargetQubitIndexValid:
+            raise IndexError('Quantum register address must be nonnegative '
+                             'integer less than size of register.')
+
+    def _generateMeasurementOutcomeProbabilities(self, target):
+        '''
+        Returns the probabilities of a computational basis zero and one
+        measurement outcome, respectively, on the qubit indexed by ``target``.
+
+        Parameters
+        ----------
+        target : int
+            The index of the qubit to be measured.
+
+        Returns
+        -------
+        list
+            The first element is the probability of a zero measurement. The
+            second element is the probability of a one measurement.
+        '''
+        # We use the relative amplitudes |0> or |1> measurements to generate
+        # corresponding probability weights.
+        amplitudes_for_zero = []
+        amplitudes_for_one = []
+
+        # Decompose the state into a dict of basis label and amplitude pairs.
+        basis_states = self.__q_reg.computational_decomp()
+        for state_label in basis_states:
+            if int(state_label[-1 - target]) == 0:
+                amplitudes_for_zero.append(basis_states[state_label])
+
+            if int(state_label[-1 - target]) == 1:
+                amplitudes_for_one.append(basis_states[state_label])
+
+        # We then use the sorted amplitudes to generate the probability weights
+        prob_for_zero = 0
+        prob_for_one = 0
+
+        for amplitude in amplitudes_for_zero:
+            prob_for_zero += amplitude * amplitude.conjugate()
+
+        for amplitude in amplitudes_for_one:
+            prob_for_one += amplitude * amplitude.conjugate()
+
+        # Check that total probability remains unity
+        prob_total = prob_for_zero + prob_for_one
+        mach_eps = np.finfo(type(prob_total)).eps
+        if not cmath.isclose(prob_total, 1, rel_tol=10*mach_eps):
+            raise NormalizationError(
+                'Sum over outcome probabilities = {}.'.format(prob_total))
+
+        return [prob_for_zero, prob_for_one]
+
+    def _makeProjectorOntoOutcomeSubspace(self, measurement_outcome, target):
+        '''
+        Makes a projection operator onto the subspace corresponding to a
+        measurement in the computational basis of the qubit indexed by
+        ``target`` yielding the result ``measurement_outcome``.
+
+        Parameters
+        ----------
+        measurement_outcome : int
+            The result of the measurement, zero or one.
+
+        target : int
+            The index of the qubit which was measured.
+
+        Returns
+        -------
+        ndarray
+            The computational basis projection operator onto the measurement
+            outcome subspace.
+        '''
+
+        # Next we project the state of q_reg onto the eigenbasis corresponding
+        # to the measurement result.
+        projector_diag = []
+        # If the qubit at address target in state_label == measurement, it is
+        # a part of the eigenbasis.
+        for state_label in self.__q_reg.computational_decomp():
+            if int(state_label[-1 - target]) == measurement_outcome:
+                projector_diag.append(1)
+
+            else:
+                projector_diag.append(0)
+
+        return np.diag(projector_diag)
+
+    def _collapseRegisterWavefunction(self, measurement_outcome, target):
+        '''
+        Collapses the ``qReg`` to the state corresponding to a measurement of
+        ``measurement_outcome`` on the qubit indexed by ``target``.
+        '''
+
+        measurement_projector = (
+            self._makeProjectorOntoOutcomeSubspace(
+                measurement_outcome, target))
+
+        collapsed_state = np.dot(measurement_projector, self.__q_reg.state())
+        self.__q_reg.change_state(collapsed_state)
 
     def __iadd__(self, n_new_qubits):
         '''
         Adds ``n_new_qubits`` qubits to the register in the |0> state.
         '''
 
-        if self.__killed:
+        if self.__is_dereferenced:
             raise IllegalRegisterReference('Attempt to add Qubits to '
-                                                 'dereferenced register.')
+                                           'dereferenced register.')
 
         if not isinstance(n_new_qubits, int) or n_new_qubits < 0:
             raise ValueError("Can only add a positive integer number of "
@@ -424,7 +476,7 @@ class qReg:
         Concatentates the register with some_reg (|a_reg> *= |some_reg> stores
         |a_reg>|some_reg> into ``a_reg``).
         '''
-        if self.__killed or some_reg.__killed:
+        if self.__is_dereferenced or some_reg.__is_dereferenced:
             raise IllegalRegisterReference(
                 'Concatentation attempted on dereferenced register.')
 
@@ -433,7 +485,7 @@ class qReg:
 
         self.__q_reg = self.__q_reg.qubit_product(some_reg._qReg__q_reg)
 
-        some_reg._qReg__killed = True
+        some_reg._qReg__is_dereferenced = True
 
         return self
 
@@ -443,22 +495,22 @@ class qReg:
         (|new> = |reg> * |another_reg> stores the product into ``new``).
         '''
 
-        if self.__killed or another_reg.__killed:
+        if self.__is_dereferenced or another_reg.__is_dereferenced:
             raise IllegalRegisterReference(
                 'Concatentation attempted on dereferenced register.')
 
         new_register = qReg()
         new_state = self.__q_reg.qubit_product(another_reg._qReg__q_reg)
 
-        self.__killed = True
-        another_reg._qReg__killed = True
+        self.__is_dereferenced = True
+        another_reg._qReg__is_dereferenced = True
 
         new_register._qReg__q_reg.change_state(new_state.state())
 
         return new_register
 
     def __len__(self):
-        if self.__killed:
+        if self.__is_dereferenced:
             raise IllegalRegisterReference(
                 'Dereferenced register encountered.')
 
@@ -471,7 +523,7 @@ class qReg:
         raise IllegalCopyAttempt('Cannot copy a qReg.')
 
     def __repr__(self):
-        if not self.__killed:
+        if not self.__is_dereferenced:
             return "qReg({})".format(len(self))
         else:
             return "Dereferenced qReg"
@@ -553,7 +605,6 @@ class qOp:
         self.__validate_kraus_ops(kraus_ops)
         self.__noise_model = kraus_ops
 
-
     def __validate_kraus_ops(self, kraus_ops):
         # Checks on the validity of the Kraus operators
         # Check that the size of the Kraus operators agrees with the gate size
@@ -576,7 +627,7 @@ class qOp:
             kraus_shape = kraus_ops[0].shape
             if kraus_shape[0] != kraus_shape[1]:
                 raise WrongShapeError("Kraus operators must be square "
-                                            "matrices.")
+                                      "matrices.")
 
             # Check that kraus_ops are trace-preserving
             identity = np.identity(kraus_shape[0])
@@ -586,12 +637,12 @@ class qOp:
 
             if not np.allclose(sum, identity):
                 raise NormalizationError("Kraus operators must be "
-                                               "trace-preserving.")
+                                         "trace-preserving.")
 
             for op in kraus_ops:
                 if op.shape != kraus_shape:
                     raise WrongShapeError("All Kraus operators must "
-                                                "have same shape.")
+                                          "have same shape.")
                 for row in op:
                     try:
                         len(row)
@@ -607,7 +658,7 @@ class qOp:
             gate_shape = self.__state.shape()
             if gate_shape != kraus_shape:
                 raise WrongShapeError("Size mismatch between Kraus "
-                                            "operators and gate.")
+                                      "operators and gate.")
 
     def set_noise_model(self, kraus_ops):
         '''
@@ -766,7 +817,7 @@ class qOp:
         of qubits gate operates on.
         '''
 
-        if q_reg._qReg__killed:
+        if q_reg._qReg__is_dereferenced:
             raise IllegalRegisterReference(
                 "Cannot operate on a dereferenced register.")
 

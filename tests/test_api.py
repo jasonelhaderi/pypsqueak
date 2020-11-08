@@ -41,6 +41,23 @@ class qRegSuccess(unittest.TestCase):
         H.on(self.test_reg, 0)
         self.assertEqual(-1, self.test_reg.measure_observable(I.kron(X)))
 
+    def test_measurement_collapses_register_state(self):
+        '''
+        Check that a ``qReg`` in the normalized version of the state
+        |00> + |10> correctly collapses on measurement of qubit 0 to either
+        |00> or |10>.
+        '''
+        initiallySuperposedRegister = qReg(2)
+        H.on(initiallySuperposedRegister, 1)
+        measurement_outcome = initiallySuperposedRegister.measure(1)
+
+        if measurement_outcome == 0:
+            np.testing.assert_array_equal(
+                initiallySuperposedRegister.dump_state(), [1, 0, 0, 0])
+        else:
+            np.testing.assert_array_equal(
+                initiallySuperposedRegister.dump_state(), [0, 0, 1, 0])
+
     def test_no_target_size_match(self):
         '''
         No targets should be necessary for a ``qOp`` acting on a ``qReg`` of
@@ -189,6 +206,13 @@ class qRegFailure(unittest.TestCase):
 
         for loc in bad_locs:
             self.assertRaises(IndexError, self.test_reg.measure, loc)
+
+    def test_negative_measurement_index_fails(self):
+        '''
+        Measurement should fail for a negative qubit location index.
+        '''
+
+        self.assertRaises(IndexError, self.test_reg.measure, -1)
 
     def test_measure_observable_bad_input(self):
         '''
