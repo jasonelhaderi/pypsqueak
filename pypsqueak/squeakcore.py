@@ -403,44 +403,8 @@ class Gate:
             new_gate = np.kron(new_gate, argument.state())
         return Gate(new_gate)
 
-    @staticmethod
-    def _is_numeric_square_matrix(some_matrix):
-
-        try:
-            column_length = len(some_matrix)
-        except TypeError:
-            return False
-
-        if len(some_matrix) == 0:
-            return False
-
-        for row in some_matrix:
-            if (not _is_listlike(row)
-                or not _has_only_numeric_elements(row)
-                    or (len(row) != column_length)):
-
-                return False
-
-        return True
-
-    def _is_unitary(self, some_matrix):
-
-        if not self._is_numeric_square_matrix(some_matrix):
-            return False
-
-        product_with_hermitian_conjugate = np.dot(
-            np.array(some_matrix).conj().T,
-            some_matrix)
-
-        if not np.allclose(
-                product_with_hermitian_conjugate,
-                np.eye(len(some_matrix))):
-            return False
-        else:
-            return True
-
     def __validate_gate(self, potential_gate, gate_name):
-        if self._is_unitary(potential_gate):
+        if _is_unitary(potential_gate):
             self.__shape = (len(potential_gate), len(potential_gate[0]))
         else:
             raise TypeError("Input matrix must be a numeric, "
@@ -477,7 +441,9 @@ def _is_listlike(obj):
 
 
 def _has_only_numeric_elements(obj):
-
+    '''
+    Checks that the elements of ``obj`` are all numeric.
+    '''
     for element in obj:
         if hasattr(element, '__iter__'):
             return False
@@ -490,6 +456,49 @@ def _has_only_numeric_elements(obj):
     return True
 
 
+def _is_numeric_square_matrix(some_matrix):
+    '''
+    Checks that the argument is a numeric, square matrix.
+    '''
+
+    try:
+        column_length = len(some_matrix)
+    except TypeError:
+        return False
+
+    if len(some_matrix) == 0:
+        return False
+
+    for row in some_matrix:
+        if (not _is_listlike(row)
+            or not _has_only_numeric_elements(row)
+                or (len(row) != column_length)):
+
+            return False
+
+    return True
+
+
+def _is_unitary(some_matrix):
+    '''
+    Checks that the argument is a unitary matrix
+    '''
+
+    if not _is_numeric_square_matrix(some_matrix):
+        return False
+
+    product_with_hermitian_conjugate = np.dot(
+        np.array(some_matrix).conj().T,
+        some_matrix)
+
+    if not np.allclose(
+            product_with_hermitian_conjugate,
+            np.eye(len(some_matrix))):
+        return False
+    else:
+        return True
+
+
 def _is_normalizable(some_vector):
 
     if all(element == 0 for element in some_vector):
@@ -499,7 +508,9 @@ def _is_normalizable(some_vector):
 
 
 def _is_power_of_two(n):
-
+    '''
+    Check whether or not ``n`` is a power of two.
+    '''
     if not n == int(n):
         return False
 

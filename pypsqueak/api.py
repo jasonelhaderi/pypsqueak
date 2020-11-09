@@ -3,11 +3,11 @@ Front end of pypSQUEAK. Contains definitions of ``qReg``, ``qOp``, and
 ``qOracle`` classes which provide abstract representations of quantum hardware.
 '''
 import numpy as np
-import cmath
 
-from pypsqueak.squeakcore import Qubit, Gate
 from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
-                              NormalizationError, WrongShapeError)
+                              NormalizationError, WrongShapeError,
+                              NonUnitaryInputError)
+from pypsqueak.squeakcore import Qubit, Gate, _is_unitary
 
 
 class qReg:
@@ -158,24 +158,18 @@ class qReg:
         '''
 
         self._throwExceptionIfRequestedMeasurementIsNotValid(target)
-        measurement_outcome = np.random.choice(
-            2,
-            p=self._generateMeasurementOutcomeProbabilities(target))
-        self._collapseRegisterWavefunction(measurement_outcome, target)
 
-        return measurement_outcome
+        measurement_outcome = self.measure_observable(
+            self._makeComputationalBasisObservable(target))
+
+        # Two-state observable eigenvalues are 1 and -1,
+        # so manual translation to 0 and 1 (respectively) is needed.
+        return 0 if measurement_outcome == 1 else 1
 
     def measure_observable(self, observable):
         '''
         Performs a projective measurement of the ``observable`` corresponding
-        to a ``qOp``. In this simulated implementation, four steps are
-        involved:
-
-        #. Determine measurement outcomes.
-        #. Compute probability of each measurement using the amplitudes of each
-           basis vector in the computational basis decomposition.
-        #. Use these probabilities to randomly pick a measurement result.
-        #. Project onto the result's corresponding eigenspace.
+        to a ``qOp``.
 
         Parameters
         ----------
@@ -208,47 +202,26 @@ class qReg:
 
         '''
 
-        if not isinstance(observable, type(qOp())):
-            raise TypeError("Argument of measure_observable() must be a qOp.")
+        self._throwExceptionIfObservableToMeasureIsNotValid(observable)
+        observable = self._liftOperatorToDimensionOfRegister(observable)
 
-        if len(self) < observable.size():
-            raise WrongShapeError("Observable larger than qReg.")
+        measurementEigenvalues, measurementTransitionMatrix = np.linalg.eig(
+            observable._qOp__state.state())
+        measurementTransitionProbabilities = (
+            self._generateStateTransitionProbabilities(
+                measurementTransitionMatrix)
+        )
 
-        if len(self) > observable.size():
-            diff = len(self) - observable.size()
-            iden = qOp(np.eye(2**diff))
-            observable = iden.kron(observable)
+        measurementResult = np.random.choice(
+            measurementEigenvalues,
+            p=measurementTransitionProbabilities)
 
-        # Determine normalized eigenvalue/vector pairs.
-        e_vals, e_vecs = np.linalg.eig(observable._qOp__state.state())
+        self._collapseRegisterWavefunction(
+            measurementResult,
+            measurementEigenvalues,
+            measurementTransitionMatrix)
 
-        # Compute probabilities
-        probabilities = []
-        current_state = self.__q_reg.state()
-        for i in range(len(e_vecs)):
-            amplitude = np.dot(current_state, e_vecs[:, i])
-            probabilities.append(amplitude * amplitude.conj())
-
-        # Choose measurement result
-        measurement_index = np.random.choice(
-            [i for i in range(len(e_vals))], p=probabilities)
-        measurement_result = e_vals[measurement_index]
-
-        # Build subspace corresponding to eigenvalue
-        subspace_basis = []
-        for i in range(len(e_vals)):
-            if e_vals[i] == measurement_result:
-                subspace_basis.append(e_vecs[:, i])
-
-        # Make projection operator
-        projector = np.outer(subspace_basis[0], subspace_basis[0])
-        for i in range(1, len(subspace_basis)):
-            projector += np.outer(subspace_basis[i], subspace_basis[i])
-
-        new_state = np.dot(projector, current_state)
-        self.__q_reg.change_state(new_state)
-
-        return measurement_result
+        return measurementResult
 
     def peek(self):
         '''
@@ -353,102 +326,118 @@ class qReg:
             raise IndexError('Quantum register address must be nonnegative '
                              'integer less than size of register.')
 
-    def _generateMeasurementOutcomeProbabilities(self, target):
+    def _throwExceptionIfObservableToMeasureIsNotValid(self, observable):
+        if not isinstance(observable, type(qOp())):
+            raise TypeError("Argument of measure_observable() must be a qOp.")
+
+        if len(self) < observable.size():
+            raise WrongShapeError("Observable larger than qReg.")
+
+    def _liftOperatorToDimensionOfRegister(self, operator):
         '''
-        Returns the probabilities of a computational basis zero and one
-        measurement outcome, respectively, on the qubit indexed by ``target``.
+        Takes the ``qOp`` ``operator`` and if its size is smaller than the
+        ``qReg``, returns a 'lifted' version of the operator that has been
+        prepended with the tensor product of
+        ``len(qReg) - operator.size()`` copies of the identity operator. If
+        the size of ``operator`` already matches that of the ``qReg``, an
+        unchanged version of ``operator`` is returned.
 
         Parameters
         ----------
-        target : int
-            The index of the qubit to be measured.
+        operator : qOp
+        The operator to be lifted.
+
+        Returns
+        -------
+        qOp
+        A version of the operator lifted to be of the same dimension as the
+        qReg.
+        '''
+        if len(self) > operator.size():
+            diff = len(self) - operator.size()
+            iden = qOp(np.eye(2**diff))
+            operator = iden.kron(operator)
+
+        return operator
+
+    def _makeComputationalBasisObservable(self, target):
+        '''
+        Returns a ``qOp`` corresponding to the observable for a computational
+        basis measurement on the qubit indexed by ``target``. Since this takes
+        the form (identity operator)^m * (Pauli Z) * (identity operator)^m,
+        with m + n + 1 equal the size of the ``qReg``, the eigenvalues of this
+        operator are 1 and -1.
+        '''
+        from pypsqueak.gates import I, Z
+
+        if target == len(self) - 1:
+            observable = Z
+        else:
+            observable = I
+
+        for i in reversed(range(len(self) - 1)):
+            if i == target:
+                observable = observable.kron(Z)
+            else:
+                observable = observable.kron(I)
+
+        return observable
+
+    def _generateStateTransitionProbabilities(self, transitionMatrix):
+        '''
+        Returns a list of the transition probabilities from the current
+        ``qReg`` state to the set of normalized states specified by each column
+        of the array ``transitionMatrix``.
+
+        Parameters
+        ----------
+        potentialTransitions : array
+        A list of normalized eigenvectors representing possible new states for
+        the ``qReg``.
 
         Returns
         -------
         list
-            The first element is the probability of a zero measurement. The
-            second element is the probability of a one measurement.
-        '''
-        # We use the relative amplitudes |0> or |1> measurements to generate
-        # corresponding probability weights.
-        amplitudes_for_zero = []
-        amplitudes_for_one = []
-
-        # Decompose the state into a dict of basis label and amplitude pairs.
-        basis_states = self.__q_reg.computational_decomp()
-        for state_label in basis_states:
-            if int(state_label[-1 - target]) == 0:
-                amplitudes_for_zero.append(basis_states[state_label])
-
-            if int(state_label[-1 - target]) == 1:
-                amplitudes_for_one.append(basis_states[state_label])
-
-        # We then use the sorted amplitudes to generate the probability weights
-        prob_for_zero = 0
-        prob_for_one = 0
-
-        for amplitude in amplitudes_for_zero:
-            prob_for_zero += amplitude * amplitude.conjugate()
-
-        for amplitude in amplitudes_for_one:
-            prob_for_one += amplitude * amplitude.conjugate()
-
-        # Check that total probability remains unity
-        prob_total = prob_for_zero + prob_for_one
-        mach_eps = np.finfo(type(prob_total)).eps
-        if not cmath.isclose(prob_total, 1, rel_tol=10*mach_eps):
-            raise NormalizationError(
-                'Sum over outcome probabilities = {}.'.format(prob_total))
-
-        return [prob_for_zero, prob_for_one]
-
-    def _makeProjectorOntoOutcomeSubspace(self, measurement_outcome, target):
-        '''
-        Makes a projection operator onto the subspace corresponding to a
-        measurement in the computational basis of the qubit indexed by
-        ``target`` yielding the result ``measurement_outcome``.
-
-        Parameters
-        ----------
-        measurement_outcome : int
-            The result of the measurement, zero or one.
-
-        target : int
-            The index of the qubit which was measured.
-
-        Returns
-        -------
-        ndarray
-            The computational basis projection operator onto the measurement
-            outcome subspace.
+        A list of corresponding transition probabilities for each possible new
+        state.
         '''
 
-        # Next we project the state of q_reg onto the eigenbasis corresponding
-        # to the measurement result.
-        projector_diag = []
-        # If the qubit at address target in state_label == measurement, it is
-        # a part of the eigenbasis.
-        for state_label in self.__q_reg.computational_decomp():
-            if int(state_label[-1 - target]) == measurement_outcome:
-                projector_diag.append(1)
+        if not _is_unitary(transitionMatrix):
+            raise NonUnitaryInputError("Non-unitary transition matrix "
+                                       "encountered while computing "
+                                       "qReg transition probabilities.")
 
-            else:
-                projector_diag.append(0)
+        currentStateAsRowVector = self.__q_reg.state().T
+        transitionAmplitudes = np.dot(
+            currentStateAsRowVector,
+            transitionMatrix
+        )
+        transitionProbabilities = [
+            amplitude * amplitude.conj() for amplitude in transitionAmplitudes
+        ]
 
-        return np.diag(projector_diag)
+        return transitionProbabilities
 
-    def _collapseRegisterWavefunction(self, measurement_outcome, target):
+    def _collapseRegisterWavefunction(
+            self,
+            measurementResult,
+            measurementEigenvalues,
+            measurementTransitionMatrix):
         '''
         Collapses the ``qReg`` to the state corresponding to a measurement of
-        ``measurement_outcome`` on the qubit indexed by ``target``.
+        ``measurementResult`` for an observable with eigenvalues given by the
+        list ``measurementEigenvalues`` and normalized measurement outcomes
+        given by the columns of ``measurementTransitionMatrix``.
         '''
 
-        measurement_projector = (
-            self._makeProjectorOntoOutcomeSubspace(
-                measurement_outcome, target))
+        collapsedState = np.dot(
+            _makeProjectorOnToSubspace(
+                measurementResult,
+                measurementEigenvalues,
+                measurementTransitionMatrix),
+            self.__q_reg.state())
 
-        collapsed_state = np.dot(measurement_projector, self.__q_reg.state())
-        self.__q_reg.change_state(collapsed_state)
+        self.__q_reg.change_state(collapsedState)
 
     def __iadd__(self, n_new_qubits):
         '''
@@ -1177,3 +1166,52 @@ class qOracle(qOp):
 
     def __repr__(self):
         return "qOracle({}, {})".format(self.__domain_exp, self.__range_exp)
+
+
+def _makeProjectorOnToSubspace(
+        subspaceEigenvalue,
+        allEigenvalues,
+        matrixOfBasisVectors):
+    '''
+    Makes a projection operator onto the subspace of Hilbert space
+    which corresponds to ``subspaceEigenvalue``, where the columns of
+    ``matrixOfBasisVectors`` provide a basis on the Hilbert space (assumed
+    to be of dimension ``len(matrixOfBasisVectors)``), and the
+    ``i``-th element of the list ``allEigenvalues`` is the eigenvalue
+    corresponding to the ``i``-th column of ``matrixOfBasisVectors``.
+
+    Parameters
+    ----------
+    measurementResult : int or float
+        The result of a measurement (must be an element of
+        measurementEigenvalues).
+
+    measurementEigenvalues : list
+        A list of possible measurement outcome values. The order of this
+        list is assumed to match the order of columns in
+        measurementTransitionMatrix.
+
+    measurementTransitionMatrix : array
+        A square, unitary matrix. The columns of this matrix are assumed
+        to be a decomposition of the Hilbert space of the qReg in the
+        basis described by all possible measurement outcomes (with respect
+        to an observable implicitly defined by the matrix).
+
+    Returns
+    -------
+    ndarray
+        The projection operator onto the measurement
+        outcome subspace.
+    '''
+    dimensionOfHilbertSpace = len(matrixOfBasisVectors)
+    projector = np.zeros((
+        dimensionOfHilbertSpace,
+        dimensionOfHilbertSpace
+    ))
+
+    for eigenvalue, state in zip(
+            allEigenvalues, matrixOfBasisVectors.T):
+        if eigenvalue == subspaceEigenvalue:
+            projector += np.outer(state, state)
+
+    return projector

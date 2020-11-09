@@ -22,8 +22,8 @@ class NormalizationError(ValueError):
 
 class NonUnitaryInputError(ValueError):
     '''
-    Raised when trying to instantiate a ``Gate`` with a nonunitary
-    argument.
+    Raised wherever a non-unitary matrix is encountered and a
+    unitary matrix is expected.
     '''
     pass
 

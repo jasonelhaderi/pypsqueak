@@ -8,7 +8,7 @@ import copy
 from pypsqueak.gates import I, X, Z, H, CNOT
 from pypsqueak.api import qReg, qOp
 from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
-                              WrongShapeError)
+                              WrongShapeError, NonUnitaryInputError)
 
 
 class qRegSuccess(unittest.TestCase):
@@ -57,6 +57,15 @@ class qRegSuccess(unittest.TestCase):
         else:
             np.testing.assert_array_equal(
                 initiallySuperposedRegister.dump_state(), [0, 0, 1, 0])
+
+    def test_measurement_on_five_qubit_state(self):
+        register = qReg(5)
+        X.on(register, 3)
+        X.on(register, 0)
+        H.on(register, 1)
+
+        self.assertEqual(register.measure(3), 1)
+        self.assertEqual(register.measure(4), 0)
 
     def test_no_target_size_match(self):
         '''
@@ -229,6 +238,21 @@ class qRegFailure(unittest.TestCase):
         for op in invalid_ops:
             self.assertRaises(TypeError, self.test_reg.measure_observable, op)
 
+
+    def test__generateStateTransitionProbabilities(self):
+        '''
+        Checks that a ``NonUnitaryInputError`` is thrown for nonunitary
+        arguments.
+        '''
+        nonUnitaryMatrix = np.eye(4)
+        nonUnitaryMatrix[0, 0] = 0
+
+        twoQubitRegister = qReg(2)
+
+        self.assertRaises(
+            NonUnitaryInputError,
+            twoQubitRegister._generateStateTransitionProbabilities,
+            nonUnitaryMatrix)
 
 class qOpSuccess(unittest.TestCase):
 
