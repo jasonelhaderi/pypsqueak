@@ -9,6 +9,7 @@ from pypsqueak.gates import I, X, Z, H, CNOT
 from pypsqueak.api import qReg, qOp
 from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
                               WrongShapeError, NonUnitaryInputError)
+from pypsqueak.noise import damping_map
 
 
 class qRegSuccess(unittest.TestCase):
@@ -98,9 +99,10 @@ class qRegSuccess(unittest.TestCase):
                                              self.test_reg.dump_state())
         self.assertEqual(1, result)
 
-    def test_operator_overloading(self):
+    def test_operator_overloading_misc(self):
         '''
-        Tests that operator overloading behaves correctly for ``qReg`` objects.
+        Tests that several operator overloading methods behave correctly
+        for ``qReg`` objects.
         '''
 
         temp_reg = qReg()
@@ -116,6 +118,29 @@ class qRegSuccess(unittest.TestCase):
         state_0011 = np.zeros(16)
         state_0011[3] = 1
         np.testing.assert_array_equal(state_0011, a_new_reg.dump_state())
+
+    def test_operator_overloading_iadd(self):
+        '''
+        Tests that `+=` adds one or more qubits to register.
+        '''
+
+        q = qReg()
+        q += 3
+
+        self.assertEqual(4, len(q))
+
+    def test_operator_overloading_imul_dereferences_arg(self):
+        '''
+        Checks that `*=` dereferences the right hand operand.
+        '''
+
+        q = qReg()
+        p = qReg()
+
+        q *= p
+
+        self.assertTrue(p._qReg__is_dereferenced)
+        self.assertFalse(q._qReg__is_dereferenced)
 
 
 class qRegFailure(unittest.TestCase):
@@ -153,10 +178,9 @@ class qRegFailure(unittest.TestCase):
     def test_mult_checks_both_regs_for_dereference(self):
         '''
         Verifies that multiplication checks whether both argument registers are
-        dereferenced. Added in pypSQUEAK 2.0.1.
+        dereferenced.
         '''
 
-        # Produce an active and dereferenced register (b and a, respectively).
         a = qReg()
         b = a * qReg()
 
@@ -238,7 +262,6 @@ class qRegFailure(unittest.TestCase):
         for op in invalid_ops:
             self.assertRaises(TypeError, self.test_reg.measure_observable, op)
 
-
     def test__generateStateTransitionProbabilities(self):
         '''
         Checks that a ``NonUnitaryInputError`` is thrown for nonunitary
@@ -253,6 +276,49 @@ class qRegFailure(unittest.TestCase):
             NonUnitaryInputError,
             twoQubitRegister._generateStateTransitionProbabilities,
             nonUnitaryMatrix)
+
+    def test_operator_overloading_iadd_fails_for_nonint(self):
+        '''
+        Checks that a ValueError is thrown for noninteger right hand operand
+        to `+=`.
+        '''
+
+        q = qReg()
+
+        self.assertRaises(ValueError, q.__iadd__, 3.2)
+
+    def test_operator_overloading_iadd_fails_for_negative_arg(self):
+        '''
+        Checks that a ValueError is throws for negative right hand operand to
+        `+=`.
+        '''
+
+        q = qReg()
+
+        self.assertRaises(ValueError, q.__iadd__, -2)
+
+    def test_operator_overloading_imul_fails_for_non_qreg_arg(self):
+        '''
+        Checks that `*=` throws a TypeError when the right hand operand is
+        not a `qReg`.
+        '''
+
+        q = qReg()
+        self.assertRaises(TypeError, q.__imul__, 4)
+
+    def test_operator_overloading_imul_on_dereferenced_args_fails(self):
+        '''
+        Checks that `*=` fails when either involved register is dereferenced.
+        '''
+
+        q = qReg()
+        p = qReg()
+        q *= p
+        r = qReg()
+
+        self.assertRaises(IllegalRegisterReference, q.__imul__, p)
+        self.assertRaises(IllegalRegisterReference, p.__imul__, r)
+
 
 class qOpSuccess(unittest.TestCase):
 
@@ -302,6 +368,71 @@ class qOpSuccess(unittest.TestCase):
         state_000 = np.array([1, 0, 0, 0, 0, 0, 0, 0])
         np.testing.assert_array_equal(state_000, self.test_reg.dump_state())
 
+    def test_known_swaps(self):
+        '''
+        Verifies known swaps in the private ``qOp.__generate_swap()`` method.
+        '''
+
+        # Verify that |100> gets swapped to |001>
+        X.on(self.test_reg, 2)
+        swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg, 2)
+        state_100 = np.zeros(8)
+        state_100[1] = 1
+        np.testing.assert_array_equal(state_100,
+                                      np.dot(swap, self.test_reg.dump_state()))
+
+        # Verify that |100> gets swapped to |010> with targets 1, 2
+        swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg,
+                                                              1, 2)
+        state_010 = np.zeros(8)
+        state_010[2] = 1
+        np.testing.assert_array_equal(state_010,
+                                      np.dot(swap, self.test_reg.dump_state()))
+
+        # Verify that (|010> - |011>)/sqrt(2) gets
+        # swapped to (|100> - |101>)/sqrt(2) with targets 0, 2 and 0, 2, 1
+        for i in range(len(self.test_reg)):
+            X.on(self.test_reg, i)
+        H.on(self.test_reg, 0)
+        swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg,
+                                                              0, 2)
+        np.testing.assert_array_equal(swap,
+                                      self.test_op._qOp__generate_swap(
+                                          self.test_reg, 0, 2, 1)[0])
+        np.testing.assert_array_equal(swap,
+                                      self.test_op._qOp__generate_swap(
+                                          self.test_reg, 0, 2)[1])
+        state_hadamard = np.zeros(8)
+        state_hadamard[4] = 1/np.sqrt(2)
+        state_hadamard[5] = -1/np.sqrt(2)
+        np.testing.assert_array_almost_equal(state_hadamard,
+                                             np.dot(
+                                                 swap,
+                                                 self.test_reg.dump_state()))
+
+    def test_set_noise_model(self):
+        '''
+        Verifies that setting a noise model succeeds.
+        '''
+
+        self.test_op.set_noise_model(damping_map(0.2))
+        some_op = qOp(np.eye(2), damping_map(0.2))
+        list_of_kraus_ops = [
+            np.array([[1, 0],
+                      [0, np.sqrt(0.8)]]),
+            np.array([[0, np.sqrt(0.2)],
+                      [0, 0]]),
+        ]
+
+        np.testing.assert_array_equal(
+            some_op._qOp__noise_model.getKrausOperators(),
+            list_of_kraus_ops
+        )
+        np.testing.assert_array_equal(
+            self.test_op._qOp__noise_model.getKrausOperators(),
+            list_of_kraus_ops
+        )
+
 
 class qOpFailure(unittest.TestCase):
 
@@ -331,24 +462,24 @@ class qOpFailure(unittest.TestCase):
         for matrix in non_unitary_matricies:
             self.assertRaises(TypeError, qOp, matrix)
 
-    def test_bad_noise_input(self):
+    def test_set_noise_model_bad_input(self):
         '''
         ``qOp`` throws a ``TypeError`` if the argument of
-        ``qOp.set_noise_model()`` isn't a list of matricies.
+        ``qOp.set_noise_model()`` isn't a NoiseModel object.
         '''
 
-        bad_kraus_ops = [[],
-                         'nope',
-                         {},
-                         15,
-                         (),
-                         np.array([2, 3]),
-                         [[14, 3], 5],
-                         [[[45, 2], [14, 3]], 3]]
+        list_of_kraus_ops = [[[0, 1], [1, 0]], [[1, 0], [0, 1]]]
 
-        for ops in bad_kraus_ops:
-            self.assertRaises(TypeError, qOp, np.eye(2), kraus_ops=ops)
-            self.assertRaises(TypeError, self.test_op.set_noise_model, ops)
+        self.assertRaises(
+            TypeError,
+            qOp,
+            np.eye(2),
+            kraus_ops=list_of_kraus_ops)
+
+        self.assertRaises(
+            TypeError,
+            self.test_op.set_noise_model,
+            list_of_kraus_ops)
 
     def test_negative_index(self):
         '''
@@ -461,47 +592,17 @@ class qOpFailure(unittest.TestCase):
         # Too few
         self.assertRaises(WrongShapeError, CNOT.on, self.test_reg, 1)
 
-    def test_known_swaps(self):
+    def test_qOpSizeMismatchWithNoiseModel(self):
         '''
-        Verifies known swaps in the private ``qOp.__generate_swap()`` method.
+        An exception gets thrown if the dimensions of the Kraus operators don't
+        match the dimensions of the ``qOp`` when calling
+        ``qOp.set_noise_model()``.
         '''
 
-        # Verify that |100> gets swapped to |001>
-        X.on(self.test_reg, 2)
-        swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg, 2)
-        state_100 = np.zeros(8)
-        state_100[1] = 1
-        np.testing.assert_array_equal(state_100,
-                                      np.dot(swap, self.test_reg.dump_state()))
+        twoQubitOperator = qOp().kron(qOp())
 
-        # Verify that |100> gets swapped to |010> with targets 1, 2
-        swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg,
-                                                              1, 2)
-        state_010 = np.zeros(8)
-        state_010[2] = 1
-        np.testing.assert_array_equal(state_010,
-                                      np.dot(swap, self.test_reg.dump_state()))
-
-        # Verify that (|010> - |011>)/sqrt(2) gets
-        # swapped to (|100> - |101>)/sqrt(2) with targets 0, 2 and 0, 2, 1
-        for i in range(len(self.test_reg)):
-            X.on(self.test_reg, i)
-        H.on(self.test_reg, 0)
-        swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg,
-                                                              0, 2)
-        np.testing.assert_array_equal(swap,
-                                      self.test_op._qOp__generate_swap(
-                                          self.test_reg, 0, 2, 1)[0])
-        np.testing.assert_array_equal(swap,
-                                      self.test_op._qOp__generate_swap(
-                                          self.test_reg, 0, 2)[1])
-        state_hadamard = np.zeros(8)
-        state_hadamard[4] = 1/np.sqrt(2)
-        state_hadamard[5] = -1/np.sqrt(2)
-        np.testing.assert_array_almost_equal(state_hadamard,
-                                             np.dot(
-                                                 swap,
-                                                 self.test_reg.dump_state()))
+        self.assertRaises(WrongShapeError,
+                          twoQubitOperator.set_noise_model, damping_map(0.5))
 
 
 if __name__ == '__main__':

@@ -8,6 +8,7 @@ from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
                               NormalizationError, WrongShapeError,
                               NonUnitaryInputError)
 from pypsqueak.squeakcore import Qubit, Gate, _is_unitary
+from pypsqueak.noise import NoiseModel
 
 
 class qReg:
@@ -202,7 +203,7 @@ class qReg:
 
         '''
 
-        self._throwExceptionIfObservableToMeasureIsNotValid(observable)
+        self._throwExceptionIfObservableMeasurementIsNotValid(observable)
         observable = self._liftOperatorToDimensionOfRegister(observable)
 
         measurementEigenvalues, measurementTransitionMatrix = np.linalg.eig(
@@ -326,7 +327,11 @@ class qReg:
             raise IndexError('Quantum register address must be nonnegative '
                              'integer less than size of register.')
 
-    def _throwExceptionIfObservableToMeasureIsNotValid(self, observable):
+    def _throwExceptionIfObservableMeasurementIsNotValid(self, observable):
+        if self.__is_dereferenced:
+            raise IllegalRegisterReference("Measurement attempted on "
+                                           "dereferenced register.")
+
         if not isinstance(observable, type(qOp())):
             raise TypeError("Argument of measure_observable() must be a qOp.")
 
@@ -441,7 +446,8 @@ class qReg:
 
     def __iadd__(self, n_new_qubits):
         '''
-        Adds ``n_new_qubits`` qubits to the register in the |0> state.
+        Prepends ``n_new_qubits`` qubits to the register in the |0> state.
+        Leaves register unchanged if n_new_qubits is zero.
         '''
 
         if self.__is_dereferenced:
@@ -449,15 +455,13 @@ class qReg:
                                            'dereferenced register.')
 
         if not isinstance(n_new_qubits, int) or n_new_qubits < 0:
-            raise ValueError("Can only add a positive integer number of "
-                             "qubits to quantumRegister.")
+            raise ValueError("Can only add a nonnegative integer number of "
+                             "qubits to qReg.")
 
-        new_register = Qubit()
-        for i in range(n_new_qubits - 1):
-            new_register = new_register.qubit_product(Qubit())
+        n_qubits_in_zero_state = Qubit(
+            [1 if i == 0 else 0 for i in range(2**n_new_qubits)])
 
-        self.__q_reg = new_register.qubit_product(self.__q_reg)
-
+        self.__q_reg = n_qubits_in_zero_state.qubit_product(self.__q_reg)
         return self
 
     def __imul__(self, some_reg):
@@ -465,38 +469,37 @@ class qReg:
         Concatentates the register with some_reg (|a_reg> *= |some_reg> stores
         |a_reg>|some_reg> into ``a_reg``).
         '''
+
+        if not isinstance(some_reg, type(qReg())):
+            raise TypeError("Cannot concatentate a non-qReg to a qReg.")
+
         if self.__is_dereferenced or some_reg.__is_dereferenced:
             raise IllegalRegisterReference(
                 'Concatentation attempted on dereferenced register.')
 
-        if not isinstance(some_reg, type(qReg())):
-            raise ValueError("Cannot concatentate a qReg to a non-qReg.")
-
         self.__q_reg = self.__q_reg.qubit_product(some_reg._qReg__q_reg)
-
         some_reg._qReg__is_dereferenced = True
 
         return self
 
     def __mul__(self, another_reg):
         '''
-        For concatentating the register with another_reg
+        For concatenating the register with another_reg
         (|new> = |reg> * |another_reg> stores the product into ``new``).
         '''
 
         if self.__is_dereferenced or another_reg.__is_dereferenced:
             raise IllegalRegisterReference(
-                'Concatentation attempted on dereferenced register.')
+                'Concatenation attempted on dereferenced register.')
 
-        new_register = qReg()
-        new_state = self.__q_reg.qubit_product(another_reg._qReg__q_reg)
+        product_register = qReg()
+        product_qubits = self.__q_reg.qubit_product(another_reg._qReg__q_reg)
+        product_register._qReg__q_reg.change_state(product_qubits.state())
 
         self.__is_dereferenced = True
         another_reg._qReg__is_dereferenced = True
 
-        new_register._qReg__q_reg.change_state(new_state.state())
-
-        return new_register
+        return product_register
 
     def __len__(self):
         if self.__is_dereferenced:
@@ -590,64 +593,16 @@ class qOp:
 
     def __init__(self, matrix_rep=[[1, 0], [0, 1]], kraus_ops=None):
         self.__state = Gate(matrix_rep)
+        self.set_noise_model(kraus_ops)
 
-        self.__validate_kraus_ops(kraus_ops)
-        self.__noise_model = kraus_ops
-
-    def __validate_kraus_ops(self, kraus_ops):
-        # Checks on the validity of the Kraus operators
-        # Check that the size of the Kraus operators agrees with the gate size
-        # Check that if kraus_ops are given, they are in the form of a list of
-        # matrix like objects.
-        if not isinstance(kraus_ops, type(None)):
-            # Check that argument kraus_ops has the right form
-            if not isinstance(kraus_ops, list):
-                raise TypeError("kraus_ops must be a list of matricies.")
-            if len(kraus_ops) < 2:
-                raise TypeError("Must specify at least two Kraus operators "
-                                "for a quantum op.")
-
-            # Check that each element of kraus_ops is a ndarray
-            if not all(isinstance(op, type(np.array([]))) for op in kraus_ops):
-                raise TypeError("Each operator in kraus_ops must be a numpy "
-                                "array.")
-
-            # Check that each operator in kraus_ops has the correct shape.
-            kraus_shape = kraus_ops[0].shape
-            if kraus_shape[0] != kraus_shape[1]:
-                raise WrongShapeError("Kraus operators must be square "
-                                      "matrices.")
-
-            # Check that kraus_ops are trace-preserving
-            identity = np.identity(kraus_shape[0])
-            sum = np.matmul(np.conjugate(kraus_ops[0].T), kraus_ops[0])
-            for i in range(1, len(kraus_ops)):
-                sum += np.matmul(np.conjugate(kraus_ops[i].T), kraus_ops[i])
-
-            if not np.allclose(sum, identity):
-                raise NormalizationError("Kraus operators must be "
-                                         "trace-preserving.")
-
-            for op in kraus_ops:
-                if op.shape != kraus_shape:
-                    raise WrongShapeError("All Kraus operators must "
-                                          "have same shape.")
-                for row in op:
-                    try:
-                        len(row)
-                    except TypeError:
-                        raise TypeError("Rows of kraus_ops matricies must be "
-                                        "list-like.")
-                    for element in row:
-                        try:
-                            element + 5
-                        except TypeError:
-                            raise TypeError("Elements of kraus_ops matricies "
-                                            "must be numeric.")
-            gate_shape = self.__state.shape()
-            if gate_shape != kraus_shape:
-                raise WrongShapeError("Size mismatch between Kraus "
-                                      "operators and gate.")
+    def __noiseModelMatchesGateSize(self, kraus_ops):
+        if isinstance(kraus_ops, type(None)):
+            return True
+        elif (not isinstance(kraus_ops, type(NoiseModel()))
+              or self.__state.shape() != kraus_ops.shape()):
+            return False
+        else:
+            return True
 
     def set_noise_model(self, kraus_ops):
         '''
@@ -702,8 +657,14 @@ class qOp:
         To turn off noisy modeling, just call ``qOp.set_noise_model(None)``.
 
         '''
+        if (not isinstance(kraus_ops, type(NoiseModel()))
+                and kraus_ops is not None):
+            raise TypeError("Noise model on a qOp must be of type "
+                            "pypsqueak.noise.NoiseModel.")
 
-        self.__validate_kraus_ops(kraus_ops)
+        if not self.__noiseModelMatchesGateSize(kraus_ops):
+            raise WrongShapeError("Size mismatch between Kraus "
+                                  "operators and qOp.")
         self.__noise_model = kraus_ops
 
     def size(self):
@@ -889,7 +850,7 @@ class qOp:
             # Generate an ensemble of states transformed according to Kraus ops
             # in the form of a list of transformed state vector, and a
             # corresponding list of probability weights for each tranformation
-            for op in self.__noise_model:
+            for op in self.__noise_model.getKrausOperators():
                 # Raise each operator if necessary
                 if len(q_reg) > np.log2(op.shape[0]):
                     k = np.kron(left_eye.state(), op)
@@ -989,9 +950,9 @@ class qOp:
             The Hermitian conjugate of the operator.
         '''
 
-        herm_trans = self.__state.state().conj().T
+        herm_transpose = self.__state.state().conj().T
 
-        return qOp(herm_trans)
+        return qOp(herm_transpose)
 
     def __mul__(self, another_op):
         '''
