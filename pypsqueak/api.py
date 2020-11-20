@@ -332,7 +332,7 @@ class qReg:
             raise IllegalRegisterReference("Measurement attempted on "
                                            "dereferenced register.")
 
-        if not isinstance(observable, type(qOp())):
+        if not isinstance(observable, qOp):
             raise TypeError("Argument of measure_observable() must be a qOp.")
 
         if len(self) < observable.size():
@@ -470,7 +470,7 @@ class qReg:
         |a_reg>|some_reg> into ``a_reg``).
         '''
 
-        if not isinstance(some_reg, type(qReg())):
+        if not isinstance(some_reg, qReg):
             raise TypeError("Cannot concatentate a non-qReg to a qReg.")
 
         if self.__is_dereferenced or some_reg.__is_dereferenced:
@@ -536,8 +536,8 @@ class qOp:
     instantiated with no aguments, the resulting ``qOp`` is the identity. Other
     operations can be represented by using a matrix representation of the
     operator as a creation argument. Additionally, noise can be modeled by
-    providing a list of the the operation elements (as ``numpy.ndarray``s)
-    characterizing said noise.
+    providing a set of Kraus operators that characterizes said noise in the
+    form of a pypsqueak.noise.NoiseModel object.
 
     Examples
     --------
@@ -596,9 +596,9 @@ class qOp:
         self.set_noise_model(kraus_ops)
 
     def __noiseModelMatchesGateSize(self, kraus_ops):
-        if isinstance(kraus_ops, type(None)):
+        if kraus_ops is None:
             return True
-        elif (not isinstance(kraus_ops, type(NoiseModel()))
+        elif (not isinstance(kraus_ops, NoiseModel)
               or self.__state.shape() != kraus_ops.shape()):
             return False
         else:
@@ -766,7 +766,7 @@ class qOp:
         pypsqueak.errors.WrongShapeError: Number of registers must match number
         of qubits gate operates on.
         '''
-
+        # VALIDATION STEP
         if q_reg._qReg__is_dereferenced:
             raise IllegalRegisterReference(
                 "Cannot operate on a dereferenced register.")
@@ -1012,12 +1012,12 @@ class qOp:
 
         '''
 
-        if not isinstance(another_op, type(qOp())):
+        if not isinstance(another_op, qOp):
             raise TypeError("Arguments must be qOp objects.")
 
         matrix_reps = [another_op._qOp__state]
         for op in more_ops:
-            if not isinstance(op, type(qOp())):
+            if not isinstance(op, qOp):
                 raise TypeError("Arguments must be qOp objects.")
             matrix_reps.append(op._qOp__state)
         result_matrix = self.__state.gate_product(*matrix_reps).state()
