@@ -766,46 +766,15 @@ class qOp:
         pypsqueak.errors.WrongShapeError: Number of registers must match number
         of qubits gate operates on.
         '''
-        # VALIDATION STEP
-        if q_reg._qReg__is_dereferenced:
-            raise IllegalRegisterReference(
-                "Cannot operate on a dereferenced register.")
 
-        # Check that at least one quantum_reg location is specified when gate
-        # and register sizes don't match.
-        if len(targets) == 0 and self.size() != len(q_reg):
-            raise IndexError(
-                'One or more targets must be specified for gate and register '
-                'of different size.')
+        self._validate_qOp_application_to_qReg(q_reg, *targets)
 
-        # Check that there are no duplicate register locations for the
-        # instruction
-        if len(targets) != len(set(targets)):
-            raise ValueError(
-                'Specified quantum register targets must be unique.')
-
-        # Check that the gate size matches the number of quantum_reg locations
-        if len(targets) != 0 and self.size() != len(targets):
-            raise WrongShapeError(
-                'Number of registers must match number of qubits gate '
-                'operates on.')
-
-        if len(targets) != 0:
-            # Check that all the register locations are nonnegative integers
-            for address in targets:
-                if not isinstance(address, int):
-                    raise IndexError(
-                        'Quantum register addresses must be integer.')
-
-                if address < 0:
-                    raise IndexError(
-                        'Quantum register addresses must be nonnegative.')
-
-            # If any of the specified quantum_reg addresses have not yet been
-            # initialized, initialize them (as well as intermediate reg locs)
-            # in the |0> state
-            if max(targets) > len(q_reg) - 1:
-                q_reg += max(targets) - len(q_reg) + 1
+        # REGISTER AND GATE PREP STEPS
+        # If any of the specified quantum_reg addresses have not yet been
+        # initialized, initialize them (as well as intermediate reg locs)
+        # in the |0> state
+        if len(targets) != 0 and max(targets) > len(q_reg) - 1:
+            q_reg += max(targets) - len(q_reg) + 1
 
         # Initialize an identity gate for later use.
         iden = Gate()
@@ -832,6 +801,7 @@ class qOp:
 
             operator = left_eye.gate_product(self.__state)
 
+        # GATE APPLICATION STEP
         # If no Kraus operators are specified, evaluation of new register state
         # is trivial
         if self.__noise_model is None:
@@ -871,6 +841,38 @@ class qOp:
 
         new_reg_state = np.dot(swap_inverse, after_swap_after_op)
         q_reg._qReg__q_reg.change_state(new_reg_state)
+
+    def _validate_qOp_application_to_qReg(self, q_reg, *targets):
+        if q_reg._qReg__is_dereferenced:
+            raise IllegalRegisterReference(
+                "Cannot operate on a dereferenced register.")
+
+        self._validate_qOp_targets(*targets)
+        self._validate_qOp_and_qReg_compatability(q_reg, *targets)
+
+    def _validate_qOp_targets(self, *targets):
+        if len(targets) != len(set(targets)):
+            raise ValueError(
+                'Specified quantum register targets for operation '
+                'cannot contain duplicates.')
+
+        if any([
+                not isinstance(target, int) or target < 0
+                for target in targets]):
+            raise IndexError(
+                        'Quantum register addresses must be nonnegative ints.')
+
+    def _validate_qOp_and_qReg_compatability(self, q_reg, *targets):
+        if len(targets) == 0:
+            if self.size() != len(q_reg):
+                raise IndexError(
+                    'One or more targets must be specified for qOp to act on '
+                    'when qOp and qReg are of different size.')
+        else:
+            if self.size() != len(targets):
+                raise WrongShapeError(
+                    'Number of target qubits must match the number of qubits '
+                    'the qOp acts on.')
 
     def __generate_swap(self, q_reg, *targets):
         '''

@@ -604,6 +604,17 @@ class qOpFailure(unittest.TestCase):
         self.assertRaises(WrongShapeError,
                           twoQubitOperator.set_noise_model, damping_map(0.5))
 
+    def test_qOpFailsWhenAppliedToDereferencedqReg(self):
+        '''
+        ``IllegalRegisterReference`` is raised when attempting to operate on a
+        ``qReg``.
+        '''
+
+        q_reg = qReg()
+        q_reg._qReg__is_dereferenced = True
+
+        self.assertRaises(IllegalRegisterReference, self.test_op.on, q_reg)
+
 
 if __name__ == '__main__':
     unittest.main()
