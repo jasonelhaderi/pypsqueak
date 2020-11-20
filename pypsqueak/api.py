@@ -2,6 +2,7 @@
 Front end of pypSQUEAK. Contains definitions of ``qReg``, ``qOp``, and
 ``qOracle`` classes which provide abstract representations of quantum hardware.
 '''
+from functools import reduce
 import numpy as np
 
 from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
@@ -767,82 +768,27 @@ class qOp:
         of qubits gate operates on.
         '''
 
-        self._validate_qOp_application_to_qReg(q_reg, *targets)
+        self._validateRequestedGateApplication(q_reg, *targets)
+        self._lift_register(q_reg, *targets)
+        liftedGate = self._make_lifted_gate(q_reg)
 
-        # REGISTER AND GATE PREP STEPS
-        # If any of the specified quantum_reg addresses have not yet been
-        # initialized, initialize them (as well as intermediate reg locs)
-        # in the |0> state
-        if len(targets) != 0 and max(targets) > len(q_reg) - 1:
-            q_reg += max(targets) - len(q_reg) + 1
+        targetQubitSwapMatrix, targetQubitInverseSwap = (
+            self.__generate_swap(q_reg, *targets))
+        swappedQubitsReadyForGate = Qubit(
+            np.dot(
+                targetQubitSwapMatrix,
+                q_reg._qReg__q_reg.state()))
 
-        # Initialize an identity gate for later use.
-        iden = Gate()
+        qubitsAfterGateApplication = self._applyGateToQubits(
+            liftedGate,
+            swappedQubitsReadyForGate)
+        finalStateOfQubits = np.dot(
+            targetQubitInverseSwap,
+            qubitsAfterGateApplication.state())
 
-        # If no targets are specified, __generate_swap() returns identity
-        # matricies.
-        swap, swap_inverse = self.__generate_swap(q_reg, *targets)
+        q_reg._qReg__q_reg.change_state(finalStateOfQubits)
 
-        before_swap_and_op = q_reg._qReg__q_reg.state()
-        after_swap_before_op = np.dot(swap, before_swap_and_op)
-
-        # If the gate and size of the quantum register match, just operate
-        # with the gate
-        if len(q_reg) == self.size():
-            operator = self.__state
-
-        # If the register size is larger, we need to raise the gate
-        # (I^n tensored with gate, since operational order means the target
-        # qubits are ordered into the lowest register adresses by this point).
-        elif len(q_reg) > self.size():
-            left_eye = iden
-            for i in range(len(q_reg) - self.size() - 1):
-                left_eye = left_eye.gate_product(iden)
-
-            operator = left_eye.gate_product(self.__state)
-
-        # GATE APPLICATION STEP
-        # If no Kraus operators are specified, evaluation of new register state
-        # is trivial
-        if self.__noise_model is None:
-            after_swap_after_op = np.dot(
-                operator.state(),
-                after_swap_before_op)
-
-        else:
-            # We randomly choose one of the Kraus operators to apply, then we
-            # generate a corresponding gate to hand over to the __instr()
-            # method
-            current_state = np.dot(operator.state(), after_swap_before_op)
-            probs = []
-            new_state_ensemble = []
-
-            # Generate an ensemble of states transformed according to Kraus ops
-            # in the form of a list of transformed state vector, and a
-            # corresponding list of probability weights for each tranformation
-            for op in self.__noise_model.getKrausOperators():
-                # Raise each operator if necessary
-                if len(q_reg) > np.log2(op.shape[0]):
-                    k = np.kron(left_eye.state(), op)
-                else:
-                    k = op
-
-                new_state = k.dot(current_state)
-                new_state_ensemble.append(new_state)
-                new_dual = np.conjugate(new_state)
-                probability = np.dot(new_state, new_dual)
-                probs.append(probability)
-
-            # Pick one of the transformed states according to probs
-            new_state_index = np.random.choice(
-                [i for i in range(len(new_state_ensemble))],
-                p=probs)
-            after_swap_after_op = new_state_ensemble[new_state_index]
-
-        new_reg_state = np.dot(swap_inverse, after_swap_after_op)
-        q_reg._qReg__q_reg.change_state(new_reg_state)
-
-    def _validate_qOp_application_to_qReg(self, q_reg, *targets):
+    def _validateRequestedGateApplication(self, q_reg, *targets):
         if q_reg._qReg__is_dereferenced:
             raise IllegalRegisterReference(
                 "Cannot operate on a dereferenced register.")
@@ -873,6 +819,81 @@ class qOp:
                 raise WrongShapeError(
                     'Number of target qubits must match the number of qubits '
                     'the qOp acts on.')
+
+    def _lift_register(self, q_reg, *targets):
+        '''
+        Return a ``qReg`` with intermediate |0> qubits inserted
+        after the last qubit if the largest target is out of bounds of the
+        qReg. Return the same qReg if the largest target is within bounds.
+        '''
+
+        if len(targets) != 0 and max(targets) > len(q_reg) - 1:
+            q_reg += max(targets) - len(q_reg) + 1
+
+        return q_reg
+
+    def _make_lifted_gate(self, q_reg):
+        '''
+        Return a ``Gate`` tensored on the left with the identity
+        ``len(q_reg) - self.size()`` times. Returns an unraised ``Gate``
+        if the register and operator are of the same size.
+        '''
+
+        if len(q_reg) == self.size():
+            return self.__state
+        else:
+            left_identity_product = reduce(
+                lambda a, b: a.gate_product(b),
+                [Gate() for i in range(len(q_reg) - self.size())])
+            liftedGate = left_identity_product.gate_product(self.__state)
+
+        return liftedGate
+
+    def _applyGateToQubits(self, gate, qubits):
+        '''
+        Applies a ``Gate`` to a ``Qubit`` object.
+        '''
+
+        qubitsAfterGateApplication = Qubit(
+            np.dot(
+                gate.state(),
+                qubits.state()))
+
+        if self.__noise_model is not None:
+            self._simulateGateNoise(qubitsAfterGateApplication)
+
+        return qubitsAfterGateApplication
+
+    def _simulateGateNoise(self, qubits):
+        '''
+        Applies the NoiseModel on ``self`` to ``Qubit`` object.
+        '''
+        newStateEnsemble, probabilities = (
+            self._makeNewStateEnsembleFromKrausOperators(qubits)
+        )
+
+        selected_state = np.random.choice(
+            len(newStateEnsemble), p=probabilities)
+        qubits.change_state(newStateEnsemble[selected_state])
+
+    def _makeNewStateEnsembleFromKrausOperators(self, qubits):
+        stateEnsemble = []
+        probabilities = []
+
+        for krausOp in self.__noise_model.getKrausOperators():
+            # Raise each operator if necessary
+            if len(qubits) > np.log2(krausOp.shape[0]):
+                krausOp = np.kron(
+                    np.identity(2**(len(qubits) - self.size())), krausOp)
+
+            noise_result = krausOp.dot(qubits.state())
+            noise_result_dual = np.conjugate(noise_result)
+            probability = np.dot(noise_result, noise_result_dual)
+
+            stateEnsemble.append(noise_result)
+            probabilities.append(probability)
+
+        return stateEnsemble, probabilities
 
     def __generate_swap(self, q_reg, *targets):
         '''

@@ -433,6 +433,41 @@ class qOpSuccess(unittest.TestCase):
             list_of_kraus_ops
         )
 
+    def test_apply_noisy_gate(self):
+        '''
+        Deterministic verification of application of gate with
+        some NoiseModel set (using prob 1 amplitude damping).
+        '''
+
+        registerInZeroStateInitially = qReg()
+        registerInOneStateInitially = qReg()
+        X.on(registerInOneStateInitially)
+
+        self.test_op.set_noise_model(damping_map(1.0))
+        self.test_op.on(registerInZeroStateInitially)
+        self.test_op.on(registerInOneStateInitially)
+
+        np.testing.assert_array_equal(
+            registerInZeroStateInitially.dump_state(), [1, 0])
+        np.testing.assert_array_equal(
+            registerInOneStateInitially.dump_state(), [1, 0])
+
+    def test_apply_noisy_gate_with_raised_register(self):
+        '''
+        Deterministic verification of application of gate with
+        some NoiseModel set (using prob 1 amplitude damping) where
+        qReg needs to be raised.
+        '''
+
+        singleQubitInOneStateInitialy = qReg()
+        X.on(singleQubitInOneStateInitialy)
+
+        self.test_op.set_noise_model(damping_map(1.0))
+        self.test_op.on(singleQubitInOneStateInitialy, 1)
+
+        np.testing.assert_array_equal(
+            singleQubitInOneStateInitialy.dump_state(), [0, 1, 0, 0])
+
 
 class qOpFailure(unittest.TestCase):
 

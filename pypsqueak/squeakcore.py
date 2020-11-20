@@ -3,6 +3,7 @@ Provides core ``Qubit`` and ``Gate`` objects that function as the simulated
 backend of pypSQUEAK.
 '''
 
+from functools import reduce
 import numpy as np
 import copy
 from pypsqueak.errors import NullVectorError, WrongShapeError
@@ -343,7 +344,7 @@ class Gate:
         '''
         return self.__name
 
-    def gate_product(self, *arg):
+    def gate_product(self, *gates):
         '''
         Method for returning the Kronecker product of a gate with one or more
         other gates. When multiple arguments are specified, the product is
@@ -360,7 +361,7 @@ class Gate:
 
         Parameters
         ----------
-        *arg : pypsqueak.squeakcore.Gate
+        *gates : pypsqueak.squeakcore.Gate
             One or more ``Gate`` objects. Raises an exception if called with
             no arguments.
 
@@ -392,15 +393,15 @@ class Gate:
 
         new_gate = self.__state
 
-        if len(arg) == 0:
+        if len(gates) == 0:
             return Gate(new_gate)
 
-        for argument in arg:
+        for argument in gates:
             if not isinstance(argument, type(Gate())):
                 raise TypeError('Arguments must be Gate() objects.')
 
-        for argument in arg:
-            new_gate = np.kron(new_gate, argument.state())
+        for gate in gates:
+            new_gate = np.kron(new_gate, gate.state())
         return Gate(new_gate)
 
     def __validate_gate(self, potential_gate, gate_name):
