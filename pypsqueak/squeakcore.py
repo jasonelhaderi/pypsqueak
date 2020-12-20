@@ -94,6 +94,7 @@ class Qubit:
         '''
         A representation of the Qubit's state via a dict. Computational basis
         labels are the keys and the components of the Qubit are the values.
+        Note that the basis state labels (i.e. the keys) are big-endian.
 
         Returns
         -------

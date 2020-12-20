@@ -34,6 +34,17 @@ class NoiseModel:
     def shape(self):
         return self._shape
 
+    def __eq__(self, obj):
+        if not isinstance(obj, NoiseModel):
+            return False
+        elif (len(obj._krausOperators) == len(self._krausOperators)
+              and reduce(lambda a, b: a and b,
+                  [np.array_equal(obj._krausOperators[i], self._krausOperators[i])
+                   for i in range(len(self._krausOperators))])):
+            return True
+        else:
+            return False
+
 
 def damping_map(prob=0.1):
     '''

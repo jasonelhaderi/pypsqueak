@@ -904,12 +904,29 @@ class qOp:
         Example: |abcdef> with targets = [3, 0, 4, 1] goes to |adebfc>
         '''
 
-        # If no targets are specified, just return identity operators
-        # for the permutation matric and its inverse.
+        # If no targets are specified, just return identity operators.
         if len(targets) == 0:
             return np.eye(2**len(q_reg)), np.eye(2**len(q_reg))
 
-        # Check that the targets are valid.
+        self._validate_swap(q_reg, *targets)
+
+        qubitOrderingAfterSwap = (list(targets)
+                                  + [idx for idx in range(len(q_reg))
+                                     if idx not in targets])
+        qubitPermutationMatrix = np.array([
+            [
+                1.0 if (col == qubitOrderingAfterSwap[row]) else 0.0
+                for col in range(len(q_reg))
+            ]
+            for row in range(len(q_reg))
+        ])
+        hilbertSpacePermutationMatrix = _convertQubitPermToHilbertPerm(
+            q_reg, qubitPermutationMatrix)
+        hilbertSpacePermutationInverse = hilbertSpacePermutationMatrix.T
+
+        return hilbertSpacePermutationMatrix, hilbertSpacePermutationInverse
+
+    def _validate_swap(self, q_reg, *targets):
         if len(q_reg) < max(targets):
             raise IndexError(
                 "Uninitialized qubit referenced in swap operation.")
@@ -919,48 +936,6 @@ class qOp:
 
         if any(target < 0 for target in targets):
             raise IndexError("Negative index encountered.")
-
-        # First generate list of sorted qubit indicies.
-        new_order = []
-        for target in targets:
-            new_order.append(target)
-
-        for i in range(len(q_reg)):
-            if i not in new_order:
-                new_order.append(i)
-
-        # Use new_order to generate a corresponding permutation matrix.
-        perm_matrix = np.zeros((len(new_order), len(new_order)))
-        for i in range(len(q_reg)):
-            perm_matrix[i][new_order[i]] = 1
-
-        swap_matrix = np.zeros((2**len(q_reg), 2**len(q_reg)))
-        # Iterate through each basis label, applying permutation matrix to
-        # generate new labels. Then, Convert old and new labels to ints. The
-        # unitary matrix implementing the desired qubit swap is given by
-        # U[new][old] = 1, for each transformed pair and has 0s everywhere
-        # else.
-        for basis_label in q_reg._qReg__q_reg.computational_decomp():
-            old_label_vector = []
-            for ch in basis_label[::-1]:
-                old_label_vector.append(int(ch))
-            new_label_vector = np.dot(perm_matrix, list(old_label_vector))
-            new_label = ""
-            for ch in new_label_vector:
-                new_label += str(int(ch))
-            new_label = new_label[::-1]
-            row = int(new_label, 2)
-            col = int(basis_label, 2)
-            swap_matrix[row][col] = 1
-        swap_matrix_inverse = swap_matrix.T
-
-        # Check that the transpose is the inverse.
-        if not np.array_equal(
-                np.dot(swap_matrix, swap_matrix_inverse),
-                np.eye(2**len(q_reg))):
-            raise ValueError("Nonunitary swap encountered.")
-
-        return swap_matrix, swap_matrix_inverse
 
     def dagger(self):
         '''
@@ -973,9 +948,7 @@ class qOp:
             The Hermitian conjugate of the operator.
         '''
 
-        herm_transpose = self.__state.state().conj().T
-
-        return qOp(herm_transpose)
+        return qOp(self.__state.state().conj().T, kraus_ops=self.__noise_model)
 
     def __mul__(self, another_op):
         '''
@@ -985,15 +958,16 @@ class qOp:
         if self.size() != another_op.size():
             raise WrongShapeError("qOp size mismatch.")
 
-        product = np.dot(another_op._qOp__state.state(), self.__state.state())
-
-        return qOp(product, kraus_ops=self.__noise_model)
+        return qOp(
+            np.dot(another_op._qOp__state.state(), self.__state.state()),
+            kraus_ops=self.__noise_model)
 
     def kron(self, another_op, *more_ops):
         '''
         Returns the tensor product (implemented as a matrix Kronecker product)
         of ``self`` (x) ``another_op``. Optionally continues to tensor-in
-        additional ops in ``more_ops``.
+        additional ops in ``more_ops``. Ignores noise model set on any of the
+        factors.
 
         Parameters
         ----------
@@ -1034,21 +1008,16 @@ class qOp:
          [0 1 0 0]]
 
         '''
-
-        if not isinstance(another_op, qOp):
-            raise TypeError("Arguments must be qOp objects.")
-
-        matrix_reps = [another_op._qOp__state]
-        for op in more_ops:
+        listOfArgQOps = [another_op] + list(more_ops)
+        for op in listOfArgQOps:
             if not isinstance(op, qOp):
                 raise TypeError("Arguments must be qOp objects.")
-            matrix_reps.append(op._qOp__state)
-        result_matrix = self.__state.gate_product(*matrix_reps).state()
 
-        return qOp(result_matrix)
+        kroneckerProduct = self.__state.gate_product(
+            *[op._qOp__state for op in listOfArgQOps]).state()
+        return qOp(kroneckerProduct)
 
     def __repr__(self):
-
         return str(self.__state)
 
 
@@ -1199,3 +1168,52 @@ def _makeProjectorOnToSubspace(
             projector += np.outer(state, state)
 
     return projector
+
+
+def _flipEndiannessOfBitIterable(iterableOfBits):
+    '''
+    Returns the iterable `iterableOfBits` reversed in the form of a list,
+    casting each element to an integer.
+    '''
+
+    return list(map(int, iterableOfBits[::-1]))
+
+
+def _convertQubitPermToHilbertPerm(
+        q_reg,
+        qubitPermutationMatrix
+):
+    '''
+    Applies the transformation on computational basis states,
+    `qubitPermutationMatrix`, to each `originalBasisLabel` in the Hilbert space
+    of the `q_reg`. The result of the transformation, `newBasisLabel`, is used
+    in conjunction with the `originalBasisLabel` to determine the Hilbert space
+    version of the `qubitPermutationMatrix`.
+    '''
+    hilbertSpacePermutationMatrix = np.zeros((2**len(q_reg), 2**len(q_reg)))
+    for originalBasisLabel in q_reg._qReg__q_reg.computational_decomp():
+        newBasisLabelAsListOfInts = np.dot(
+            qubitPermutationMatrix,
+            _flipEndiannessOfBitIterable(originalBasisLabel))
+        newBasisLabel = "".join(
+            str(bit) for bit in
+            _flipEndiannessOfBitIterable(newBasisLabelAsListOfInts))
+        row = int(newBasisLabel, 2)
+        col = int(originalBasisLabel, 2)
+        hilbertSpacePermutationMatrix[row][col] = 1
+
+    _validatePermutationMatrix(hilbertSpacePermutationMatrix)
+
+    return hilbertSpacePermutationMatrix
+
+
+def _validatePermutationMatrix(permutationMatrix):
+    '''
+    Raises an exception if the transpose of `permutationMatrix`
+    doesn't invert `permutationMatrix.`
+    '''
+
+    if not np.array_equal(
+            np.dot(permutationMatrix, permutationMatrix.T),
+            np.eye(len(permutationMatrix))):
+        raise ValueError("Nonunitary swap encountered.")

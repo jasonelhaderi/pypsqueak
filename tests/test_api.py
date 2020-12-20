@@ -410,6 +410,18 @@ class qOpSuccess(unittest.TestCase):
                                                  swap,
                                                  self.test_reg.dump_state()))
 
+    def test_identity_swap_for_no_targets(self):
+        '''
+        Verifies that the private ``qOp.__generate_swap()`` retuns identity matrices as
+        permutation operators when no nargets are specified.
+        '''
+
+        two_qubits = qReg(2)
+        permutation, inverse = CNOT._qOp__generate_swap(two_qubits)
+
+        np.testing.assert_array_equal(np.eye(4,4), permutation)
+        np.testing.assert_array_equal(np.eye(4,4), inverse)
+        
     def test_set_noise_model(self):
         '''
         Verifies that setting a noise model succeeds.
@@ -467,6 +479,17 @@ class qOpSuccess(unittest.TestCase):
 
         np.testing.assert_array_equal(
             singleQubitInOneStateInitialy.dump_state(), [0, 1, 0, 0])
+
+    def test_mul_with_qOp_preserves_first_qOp_noise_model(self):
+        '''
+        Checks that after multiplication, the resulting `qOp` has
+        the same noise model as the first operand.
+        '''
+        op1 = qOp(kraus_ops=damping_map(0.3))
+        op2 = qOp()
+
+        np.testing.assert_array_equal((op1 * op2)._qOp__noise_model, damping_map(0.3))
+        self.assertEqual((op2 * op1)._qOp__noise_model, None)
 
 
 class qOpFailure(unittest.TestCase):
@@ -638,6 +661,15 @@ class qOpFailure(unittest.TestCase):
 
         self.assertRaises(WrongShapeError,
                           twoQubitOperator.set_noise_model, damping_map(0.5))
+
+    def test_kron_on_non_qOps(self):
+        '''
+        If `qOp.kron()` is called with any args not of type `qOp`,
+        raise a TypeError.
+        '''
+
+        self.assertRaises(TypeError, self.test_op.kron, np.eye(2))
+        self.assertRaises(TypeError, self.test_op.kron, self.test_op, np.eye(2))
 
     def test_qOpFailsWhenAppliedToDereferencedqReg(self):
         '''
