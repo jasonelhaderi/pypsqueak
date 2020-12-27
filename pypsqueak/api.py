@@ -6,8 +6,7 @@ from functools import reduce
 import numpy as np
 
 from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
-                              NormalizationError, WrongShapeError,
-                              NonUnitaryInputError)
+                              WrongShapeError, NonUnitaryInputError)
 from pypsqueak.squeakcore import Qubit, Gate, _is_unitary
 from pypsqueak.noise import NoiseModel
 
@@ -1036,24 +1035,16 @@ class qOracle(qOp):
     '''
 
     def __init__(self, func, n, m=1, kraus_ops=None):
-        if not isinstance(n, int) or not isinstance(m, int):
-            raise TypeError('Dimension exponents n and m must be integer.')
-        if n < 1 or m < 1:
-            raise ValueError('Dimension exponents n and m must be positive.')
-        if not callable(func):
-            raise TypeError('First argument of qOracle must be callable.')
+        if (not isinstance(n, int) or not isinstance(m, int)
+                or n < 1 or m < 1):
+            raise TypeError(
+                'Dimension exponents n and m must be positive integers.')
+
+        _validateClassicalFunction(func, n, m)
 
         self.__classical_func = func
         self.__domain_exp = n
         self.__range_exp = m
-
-        # Check that the function values are valid.
-        for value in [func(i) for i in range(2**n)]:
-            if not isinstance(value, int):
-                raise TypeError(
-                    'Range of input function contains non-integers.')
-            if value < 0 or value > 2**m - 1:
-                raise ValueError('Range of input function out of bounds.')
 
         super().__init__(self.__generate_matrix_rep(), kraus_ops=kraus_ops)
 
@@ -1093,7 +1084,6 @@ class qOracle(qOp):
 
         if not isinstance(x_val, int):
             raise TypeError("Classical function maps ints to ints.")
-
         if x_val < 0 or x_val > 2**self.__domain_exp - 1:
             raise ValueError("Classical function input out of bounds.")
 
@@ -1101,21 +1091,20 @@ class qOracle(qOp):
 
     def __generate_matrix_rep(self):
         '''
-        Generates the oracle for the register in state |x>|y>.
+        Generates the computational basis matrix representation of the oracle
+        for the register in state |x>|y>.
         '''
 
-        dim = self.__range_exp + self.__domain_exp
-        matrix_rep = np.zeros((2**dim, 2**dim))
-        col = 0
+        numberOfQubits = self.__range_exp + self.__domain_exp
+        matrixRepOfOracle = np.zeros((2**numberOfQubits, 2**numberOfQubits))
         for x in range(2**self.__domain_exp):
             for y in range(2**self.__range_exp):
-                row = "{0:b}".format(x)
-                row += "{0:b}".format(y ^ self.classical_func(x))
-                row = int(row, 2)
-                matrix_rep[row][col] += 1
-                col += 1
+                row = int(
+                    "{0:b}{1:b}".format(x, y ^ self.classical_func(x)), 2)
+                col = int("{0:b}{1:b}".format(x, y), 2)
+                matrixRepOfOracle[row][col] = 1
 
-        return matrix_rep
+        return matrixRepOfOracle
 
     def __repr__(self):
         return "qOracle({}, {})".format(self.__domain_exp, self.__range_exp)
@@ -1217,3 +1206,16 @@ def _validatePermutationMatrix(permutationMatrix):
             np.dot(permutationMatrix, permutationMatrix.T),
             np.eye(len(permutationMatrix))):
         raise ValueError("Nonunitary swap encountered.")
+
+
+def _validateClassicalFunction(func, n, m):
+    '''
+    Check that the range of `func` is integer, bound bounded
+    below by and above by `2^m - 1`.
+    '''
+    for value in [func(i) for i in range(2**n)]:
+        if not isinstance(value, int):
+            raise TypeError(
+                'Range of input function contains non-integers.')
+        if value < 0 or value > 2**m - 1:
+            raise ValueError('Range of input function out of bounds.')

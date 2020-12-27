@@ -6,7 +6,7 @@ import copy
 # pypSQUEAK modules
 # import pypsqueak.gates as gt
 from pypsqueak.gates import I, X, Z, H, CNOT
-from pypsqueak.api import qReg, qOp
+from pypsqueak.api import qReg, qOp, qOracle
 from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
                               WrongShapeError, NonUnitaryInputError)
 from pypsqueak.noise import damping_map
@@ -683,5 +683,68 @@ class qOpFailure(unittest.TestCase):
         self.assertRaises(IllegalRegisterReference, self.test_op.on, q_reg)
 
 
+class qOracleSuccess(unittest.TestCase):
+    def test_qOracle_is_subclass_of_qOp(self):
+        '''
+        Verifies that `qOracle` is a subclass of `qOp`.
+        '''
+
+        self.assertTrue(issubclass(qOracle, qOp))
+
+    def test_qOracle_const_one_func(self):
+        '''
+        Verifies that the const function f(x) = 1
+        yields the correct `qOracle`.
+        '''
+
+        blackBox = qOracle(lambda x: 1, 1)
+        np.testing.assert_array_equal(
+            blackBox._qOp__state.state(),
+            [[0, 1, 0, 0],
+             [1, 0, 0, 0],
+             [0, 0, 0, 1],
+             [0, 0, 1, 0]]
+        )
+
+    def test_qOracle_const_zero_func(self):
+        '''
+        Verifies that the const function f(x) = 0
+        yields the correct `qOracle`.
+        '''
+
+        blackBox = qOracle(lambda x: 0, 1)
+        np.testing.assert_array_equal(
+            blackBox._qOp__state.state(),
+            [[1, 0, 0, 0],
+             [0, 1, 0, 0],
+             [0, 0, 1, 0],
+             [0, 0, 0, 1]]
+        )
+
+class qOracleFailure(unittest.TestCase):
+    def test_classical_func_has_nonint_values(self):
+        '''
+        Checks that a `TypeError` is raise when the classical func arg
+        to `qOracle` has non-int values in its range.
+        '''
+        self.assertRaises(TypeError, qOracle, lambda x: 0.1, 3)
+
+    def test_classical_func_needs_to_be_callable(self):
+        '''
+        Raise a `TypeError` if the classical func used to create
+        a `qOracle` isn't a callable.
+        '''
+        self.assertRaises(TypeError, qOracle, 4, 5)
+
+    def test_non_int_dimension_exponents(self):
+        '''
+        Checks that a `TypeError` gets raised when creating a
+        `qOracle` with noninteger dimension exponents.
+        '''
+        self.assertRaises(TypeError, qOracle, lambda a: 1, 0.1)
+        self.assertRaises(TypeError, qOracle, lambda a: 0, 1, 0.1)
+        self.assertRaises(TypeError, qOracle, lambda a: 1, 0.1, 0.1)
+
+        
 if __name__ == '__main__':
     unittest.main()
