@@ -1,49 +1,5 @@
-'''
-Implements functions returning sets of trace-one Kraus operators. Each function
-corresponds to a specific kind of one-qubit noise. For an example of usage, see
-:func:`~pypsqueak.api.qOp.set_noise_model`.
-'''
-
 import numpy as np
-from pypsqueak.squeakcore import _is_numeric_square_matrix
-from pypsqueak.errors import NormalizationError, WrongShapeError
-from functools import reduce
-
-
-class NoiseModel:
-    '''
-    A map characterizing a kind of noise to be simulated in a `qOp`.
-    '''
-
-    def __init__(self, kraus_ops=None):
-        if kraus_ops is None:
-            self._krausOperators = []
-            self._shape = None
-        else:
-            self.setKrausOperators(kraus_ops)
-
-    def getKrausOperators(self):
-        return self._krausOperators
-
-    def setKrausOperators(self, listOfKrausOperators):
-        _validateListOfKrausOperators(listOfKrausOperators)
-
-        self._krausOperators = listOfKrausOperators
-        self._shape = listOfKrausOperators[0].shape
-
-    def shape(self):
-        return self._shape
-
-    def __eq__(self, obj):
-        if not isinstance(obj, NoiseModel):
-            return False
-        elif (len(obj._krausOperators) == len(self._krausOperators)
-              and reduce(lambda a, b: a and b,
-                  [np.array_equal(obj._krausOperators[i], self._krausOperators[i])
-                   for i in range(len(self._krausOperators))])):
-            return True
-        else:
-            return False
+from pypsqueak.noise import NoiseModel
 
 
 def damping_map(prob=0.1):
@@ -198,44 +154,3 @@ def bp_flip_map(prob=0.1):
                                      [1j, 0]])
 
     return NoiseModel([static, flip])
-
-
-def _isListOfIdenticalSizeSquareNumpyArrays(listOfMatrices):
-    if not isinstance(listOfMatrices, list):
-        raise TypeError("Non-list argument encountered.")
-
-    if not all(_is_numeric_square_matrix(operator)
-               and isinstance(operator, type(np.array([])))
-               and operator.shape == listOfMatrices[0].shape
-               for operator in listOfMatrices):
-        return False
-
-    return True
-
-
-def _isTracePreserving(listOfMatrices):
-    matrixDiagonalLength = listOfMatrices[0].shape[0]
-    matrixProducts = map(lambda operator:
-                         np.matmul(np.conjugate(operator.T), operator),
-                         listOfMatrices)
-    sumOfMatrixProducts = reduce(
-        lambda product1, product2: product1 + product2,
-        matrixProducts)
-
-    if not np.allclose(sumOfMatrixProducts, np.eye(matrixDiagonalLength)):
-        return False
-    else:
-        return True
-
-
-def _validateListOfKrausOperators(listOfKrausOperators):
-    if not _isListOfIdenticalSizeSquareNumpyArrays(listOfKrausOperators):
-        raise WrongShapeError("List of Kraus operators must be a "
-                              "list of numpy "
-                              "ndarrays of identical shape.")
-    if not _isTracePreserving(listOfKrausOperators):
-        raise NormalizationError("List of Kraus operators must be "
-                                 "trace-preserving.")
-    if len(listOfKrausOperators) < 2:
-        raise ValueError("List of Kraus operators must contain "
-                         "at least two elements.")
