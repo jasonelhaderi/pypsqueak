@@ -372,7 +372,7 @@ class qOp:
 
             noise_result = krausOp.dot(qubits.state())
             noise_result_dual = np.conjugate(noise_result)
-            probability = np.dot(noise_result, noise_result_dual)
+            probability = np.real(np.dot(noise_result, noise_result_dual))
 
             stateEnsemble.append(noise_result)
             probabilities.append(probability)
