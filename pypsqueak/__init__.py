@@ -1,7 +1,7 @@
-from . import api
-from . import errors
-from . import gates
-from . import noise
-from . import squeakcore
+import pypsqueak.api
+import pypsqueak.errors
+import pypsqueak.gates
+import pypsqueak.noise
+import pypsqueak.squeakcore
 
 __version__ = '2.0.0'
