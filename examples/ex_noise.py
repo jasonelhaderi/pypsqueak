@@ -4,20 +4,28 @@ import numpy as np
 from pypsqueak.api import qReg, qOp
 from pypsqueak.gates import X, I
 from pypsqueak.noise import damping_map
+import sys
 
 # Prep a qReg in the |1> state
 qubit = qReg()
 X.on(qubit)
 
 # Send it through an amp decay channel with 0.3 chance of decay.
-prob = 0.3
+if len(sys.argv) > 1 and int(sys.argv[1]) > 0:
+    n_runs = int(sys.argv[1])
+else:
+    n_runs = 1000
+
+if len(sys.argv) > 2 and float(sys.argv[2]) >= 0 and float(sys.argv[2]) <= 1:
+    prob = float(sys.argv[2])
+else:
+    prob = 0.3
 noisy_channel = qOp(kraus_ops=damping_map(prob))
 
 zeros = 0
 ones = 0
-n_runs = 1000
 
-print("Sending the state |1> through a noisy channel with amplitude decay probability={}...".format(prob))
+print("Sending the state |1> through a noisy channel {} times with amplitude decay probability={}...".format(n_runs, prob))
 for i in range(n_runs):
     noisy_channel.on(qubit)
     result = qubit.measure(0)

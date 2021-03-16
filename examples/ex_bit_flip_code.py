@@ -4,9 +4,18 @@ from pypsqueak.api import qReg, qOp
 from pypsqueak.gates import X, Z, I, ROT_Y, CNOT
 from pypsqueak.noise import b_flip_map
 import numpy as np
+import sys
 
-prob = 0.1
-n_trials = 2000
+if len(sys.argv) > 1 and int(sys.argv[1]) > 0:
+    n_trials = int(sys.argv[1])
+else:
+    n_trials = 2000
+
+if len(sys.argv) > 2 and float(sys.argv[2]) <= 1 and float(sys.argv[2]) >= 0:
+    prob = float(sys.argv[2])
+else:
+    prob = 0.1
+
 theory_success = (1 - prob)**3 + 3*prob*(1-prob)**2
 theory_failure = 1 - theory_success
 successes = 0

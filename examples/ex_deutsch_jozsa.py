@@ -3,20 +3,26 @@ import context  # Remove this import if running with pip installed version.
 from pypsqueak.api import qReg, qOracle, qOp
 from pypsqueak.gates import X, Z, H
 import numpy as np
+import sys
 
 # Number of bits in the input bitstring.
-n = 4
+if len(sys.argv) > 2 and int(sys.argv[2]) > 0:
+    n = int(sys.argv[2])
+else:
+    n = 4
 
 oracle_type, oracle_value = np.random.randint(2), np.random.randint(2)
 # Construct a list of all output values for the oracle.
 if oracle_type == 0:
     print("Using a constant oracle with {}-bit input.".format(n))
+
     def make_black_box():
         value = np.random.randint(2)
         return [value for i in range(2**n)]
 
 else:
     print("Using a balanced oracle with {}-bit input.".format(n))
+
     def make_black_box():
         oracle_list = []
         n_zeros = (2**n)/2
@@ -50,6 +56,7 @@ else:
 # # Make the black box.
 # black_box = qOracle(func, n)
 
+
 # Make a function implementing the circuit.
 def deutschJozsa(input_register, black_box):
     # Take |input_reg> to |input_reg>|1>
@@ -78,8 +85,13 @@ def deutschJozsa(input_register, black_box):
 
     return results
 
+
 # Let's try this out a whole bunch of times!
-n_tries = 10
+if len(sys.argv) > 1 and int(sys.argv[1]) > 0:
+    n_tries = int(sys.argv[1])
+else:
+    n_tries = 10
+
 zeros = 0
 ones = 0
 
