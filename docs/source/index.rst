@@ -8,12 +8,9 @@ Welcome to pypsqueak's documentation!
 
 Overview
 --------
-pypSQUEAK is an API for writing quantum programs in Python.
-The programs themselves consist of a sequence of SQUEAK (**Semantic
-Quantum Expression Architecture**) instructions.
-Program execution is simulated on a virtual machine.
-
-*More intro stuff soon.*
+Pypsqueak is an API for writing quantum programs in Python. It runs on
+a simulated backend with the long-term goal of adapting it to run
+in a hardware-agnostic fashion.
 
 Contents
 --------
