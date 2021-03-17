@@ -1,11 +1,14 @@
-from ._helpers import _validateListOfKrausOperators
-import numpy as np
-from functools import reduce
+from ._helpers import (_validateListOfKrausOperators,
+                       _listOfArraysAreEqual)
 
 
 class NoiseModel:
     '''
     A map characterizing a kind of noise to be simulated in a `qOp`.
+    Takes a list of numpy ndarrays as creation argument, or argument
+    to ``NoiseModel.setKrausOperators()``. The elemnts of the list
+    must all have the same dimension, and collectively be
+    trace-preserving.
     '''
 
     def __init__(self, kraus_ops=None):
@@ -30,10 +33,7 @@ class NoiseModel:
     def __eq__(self, obj):
         if not isinstance(obj, NoiseModel):
             return False
-        elif (len(obj._krausOperators) == len(self._krausOperators)
-              and reduce(lambda a, b: a and b,
-                  [np.array_equal(obj._krausOperators[i], self._krausOperators[i])
-                   for i in range(len(self._krausOperators))])):
+        elif _listOfArraysAreEqual(obj._krausOperators, self._krausOperators):
             return True
         else:
             return False

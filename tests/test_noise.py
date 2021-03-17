@@ -4,7 +4,7 @@ import numpy as np
 
 # pypSQUEAK modules
 from pypsqueak.errors import NormalizationError, WrongShapeError
-from pypsqueak.noise import NoiseModel
+from pypsqueak.noise import NoiseModel, b_flip_map
 
 
 # todo separate out tests on non-noisemodel classes
@@ -24,6 +24,36 @@ class NoiseModelValidInput(unittest.TestCase):
 
         damping_map = NoiseModel(damping_map_kraus_ops)
         self.assertEqual(damping_map.shape(), (2, 2))
+
+    def test_NoiseModelEqualityBitFlip(self):
+        '''
+        Checks that ``NoiseModel`` equality works for equivalent bit flip maps.
+        '''
+        prob = 0.5
+        fair_bit_flip = [
+            np.sqrt(prob)*np.array([[1, 0],
+                                    [0, 1]]),
+            np.sqrt(1 - prob)*np.array([[0, 1],
+                                        [1, 0]])
+        ]
+
+        self.assertEqual(NoiseModel(fair_bit_flip), b_flip_map(prob))
+
+    def test_NoiseModelInequalityBitFlip(self):
+        '''
+        Checks that ``NoiseModel`` equality works for inequivalent bit flip
+        maps.
+        '''
+        prob_1 = 0.9
+        prob_2 = 0.4
+        unfair_bit_flip = [
+            np.sqrt(prob_1)*np.array([[1, 0],
+                                      [0, 1]]),
+            np.sqrt(1 - prob_1)*np.array([[0, 1],
+                                          [1, 0]])
+        ]
+
+        self.assertNotEqual(NoiseModel(unfair_bit_flip), b_flip_map(prob_2))
 
 
 class NoiseModelInvalidInput(unittest.TestCase):

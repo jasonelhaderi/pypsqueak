@@ -43,3 +43,19 @@ def _validateListOfKrausOperators(listOfKrausOperators):
     if len(listOfKrausOperators) < 2:
         raise ValueError("List of Kraus operators must contain "
                          "at least two elements.")
+
+
+def _listOfArraysAreEqual(arr_list_1, arr_list_2):
+    areSameLength = len(arr_list_1) == len(arr_list_2)
+    listOfElementwiseComparisons = [
+        np.array_equal(arr_list_1[i], arr_list_2[i])
+        for i in range(len(arr_list_1))
+    ]
+    elementwiseEquality = reduce(
+        lambda a, b: a and b,
+        listOfElementwiseComparisons
+    )
+    if areSameLength and elementwiseEquality:
+        return True
+    else:
+        return False
