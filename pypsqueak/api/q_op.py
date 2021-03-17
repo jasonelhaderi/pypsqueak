@@ -8,21 +8,15 @@ from pypsqueak.squeakcore import Gate, Qubit
 
 class qOp:
     '''
-    A high-level primitive for representing unitary gates. In this
-    implementation, noise can be simulated by instantiating a ``qOp`` with the
-    kwarg ``kraus_ops``, a list of operation elements characterizing a noisy
-    quantum operation. A high-level primitive which provides users with a means
-    of interfacing with a quantum device (simulated in this implementation).
-
     A ``qOp`` is a high-level primitive which provides users with a
     representation of a quantum gate. In this implementation, the hardware of
     the gate is simulated with a ``pypsqueak.squeakcore.Gate`` object. Like the
-    underlying ``Gate``, a ``qOp`` is by default a unitary operation. When
-    instantiated with no aguments, the resulting ``qOp`` is the identity. Other
-    operations can be represented by using a matrix representation of the
-    operator as a creation argument. Additionally, noise can be modeled by
-    providing a set of Kraus operators that characterizes said noise in the
-    form of a pypsqueak.noise.NoiseModel object.
+    underlying ``Gate``, a ``qOp`` is a unitary operation. When instantiated
+    with no arguments, the resulting ``qOp`` is the identity. Other operations
+    can be represented by using a matrix representation of the operator as a
+    creation argument. Additionally, noise can be modeled by providing a set of
+    Kraus operators that characterizes said noise in the form of a
+    pypsqueak.noise.NoiseModel object.
 
     Examples
     --------
@@ -91,21 +85,21 @@ class qOp:
 
     def set_noise_model(self, kraus_ops):
         '''
-        Changes the noise model on the ``qOp`` to that specified by the list
-        of numpy ndarrays ``kraus_ops``. Each element in this list must have
-        the same dimensions, match the size of the ``qOp``, and collectively be
-        trace-preserving.
+        Changes the NoiseModel on the ``qOp`` to that specified by
+        ``kraus_ops``, Each of the elements of the ``NoiseModel``
+        has the same dimensions (matching the ``qOp``) and they are
+        collectively trace-preserving.
 
         By defualt ``kraus_ops = None``. The ``qOp`` is then noiselessly
-        emulated. Note that this method would be absent from a hardware
-        implementation of SQUEAK.
+        emulated. That this method would be absent/do nothing for a hardware
+        implementation of the backend.
 
         Parameters
         ----------
-        kraus_ops : list or None
-            A list of numpy ndarrays. Each element of the list is an operation
-            element in a generalized quantum operation. If ``None``, then no
-            noise is emulated.
+        kraus_ops : NoiseModel or None
+            A NoiseModel instance. Each element of the NoiseModel is an
+            operation element in a generalized quantum operation. If ``None``,
+            no noise is emulated.
 
         Examples
         --------

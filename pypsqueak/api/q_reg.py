@@ -9,22 +9,15 @@ from pypsqueak.squeakcore._helpers import _is_unitary
 
 class qReg:
     '''
-    A high-level primitive which provides users with a means of interfacing
-    with a quantum device (simulated in this implementation).
-
     A ``qReg`` is a high-level primitive which provides users with a
     representation of a quantum register. In this implementation, the quantum
     device on which the register exists is simulated via a
-    ``pypsqueak.squeakcore.Qubit`` object.
+    ``pypsqueak.squeakcore.Qubit`` object. Like the underlying ``Qubit``, a
+    ``qReg`` is initialized in the |0> state.
 
-    Like the underlying ``Qubit``, a ``qReg`` is initialized in the |0> state.
-    This can be overridden if the ``qReg`` is instead instantiated with some
-    other numeric vector as argument (the resulting ``qReg`` will use a
-    normalized version of that vector).
-
-    As per the no-cloning theorem, any attempt to copy a ``qReg`` object will
+    Per the no-cloning theorem, any attempt to copy a ``qReg`` object will
     throw an exception. Additionally, operations which would otherwise leave
-    duplicates of a specific instance of a ``qReg`` lying around dereference
+    duplicates of a specific instance of a ``qReg`` lying around 'dereference'
     the register. Once a ``qReg`` is dereferenced, any attempt to interact with
     the ``qReg`` will throw an exception.
 
@@ -53,12 +46,10 @@ class qReg:
     >>> a.peek()
     '(1.00e+00)|000>'
 
-    A couple of quick notes are in order. Observe that new ``qReg`` instances
-    are initialized to the zero state of the computational basis. Additionally,
-    different instances of a ``qReg`` are considered unequal even if the
-    underlying state is the same. Lastly, when ``qOp.on()`` is applied to a
-    target in a ``qReg`` that is outside the range of the register, new filler
-    qubits are automatically initialzed in the zero state.
+    Note that different instances of a ``qReg`` are considered unequal even if
+    the underlying state is the same. Additionally, when ``qOp.on()`` is
+    applied to a target in a ``qReg`` that is outside the range of the
+    register, new filler qubits are automatically initialzed in the zero state.
 
     Now we demonstrate which operators are overloaded for ``qReg`` objects as
     well as their behavior. We can append any number of qubits to a ``qReg``
@@ -119,7 +110,8 @@ class qReg:
         #. Compute probability of each measurement using the amplitudes of each
            basis vector in the computational basis decomposition.
         #. Use these probabilities to randomly pick a measurement result.
-        #. Project onto the result's corresponding eigenspace.
+        #. Project the ``qReg`` state onto the result's corresponding
+           eigenspace.
 
         Parameters
         ----------
@@ -222,10 +214,9 @@ class qReg:
 
     def peek(self):
         '''
-        Returns a ket description of the state of a ``qReg``. Note that this
-        is impossible on hardware implementations as a consequence of the
-        no-cloning theorem. If the register has been dereferenced, raises an
-        exception.
+        Returns a ket description of the state of a ``qReg``. Would have no
+        effect on hardware implementations of the backend. If the register has
+        been dereferenced, raises an exception.
 
         Returns
         -------
@@ -267,10 +258,9 @@ class qReg:
 
     def dump_state(self):
         '''
-        Returns a copy of the state of a ``qReg`` as a numpy array. Note that
-        this is impossible on hardware implementations as a consequence of the
-        no-cloning theorem. If the register has been dereferenced, raises an
-        exception.
+        Returns a copy of the state of a ``qReg`` as a numpy array. Would have
+        no effect on a hardware implementation of the backend. If the register
+        has been dereferenced, raises an exception.
 
         Returns
         -------

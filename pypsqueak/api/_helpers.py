@@ -104,8 +104,8 @@ def _validatePermutationMatrix(permutationMatrix):
 
 def _validateClassicalFunction(func, n, m):
     '''
-    Check that the range of `func` is integer, bound bounded
-    below by and above by `2^m - 1`.
+    Check that the range of `func` is integer, bounded
+    below by 0 and above by `2^m - 1`.
     '''
     for value in [func(i) for i in range(2**n)]:
         if not isinstance(value, int):

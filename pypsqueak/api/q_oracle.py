@@ -10,11 +10,11 @@ class qOracle(qOp):
 
     ``qOracle`` implements a unitary transformation U_f|x>|y> = |x>|y XOR f(x)>
     where the classical function f maps nonnegative integers to nonnegative
-    integers. Note that XOR is performed bitwise on the computational basis
-    label y and f(x). This reduces to mod 2 addition when y and f(x) are both
-    one bit long. ``n`` specifies the number of qubits in the left side portion
-    of the quantum register, while ``m`` specifies the number of qubits in the
-    right side portion.
+    integers. The XOR is performed bitwise on the computational basis label y
+    and f(x). This reduces to mod 2 addition when y and f(x) are both one bit
+    long. ``n`` specifies the number of qubits in the left side portion of the
+    quantum register, while ``m`` specifies the number of qubits in the right
+    side portion.
     '''
 
     def __init__(self, func, n, m=1, kraus_ops=None):
