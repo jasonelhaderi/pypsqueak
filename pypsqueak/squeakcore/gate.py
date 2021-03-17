@@ -100,7 +100,7 @@ class Gate:
         product as a new Gate object.
 
         Returns the Kronecker product of a ``Gate`` with one or more other
-        ``Gate``s.
+        ``Gate`` instances.
 
         When multiple arguments are specified, the product is computed
         sequentially from the leftmost argument to the rightmost.

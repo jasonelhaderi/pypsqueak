@@ -44,7 +44,8 @@ class qOp:
     [[0.-1.j 0.+0.j]
      [0.+0.j 0.-1.j]]
 
-    ``qOp``s are applied to ``qReg`` objects via the ``qOp.on()`` method:
+    ``qOp`` instances are applied to ``qReg`` objects via the ``qOp.on()``
+    method:
 
     >>> from pypsqueak.api import qReg
     >>> q = qReg()

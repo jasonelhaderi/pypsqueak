@@ -7,19 +7,24 @@ desc = 'A Python package for simulated quantum computing.'
 
 setuptools.setup(
     name='pypSQUEAK',
-    version='2.0.0',
+    version='2.1.0',
     author='Jason K. Elhaderi',
     author_email='jasonelhaderi@gmail.com',
     description=desc,
     long_description=long_description,
     long_description_content_type="text/markdown",
     url='https://github.com/jasonelhaderi/pypsqueak',
-    packages=setuptools.find_packages(exclude=['tests', 'examples', 'docs']),
+    packages=setuptools.find_packages(exclude=[
+        'tests',
+        'examples',
+        'docs',
+        'htmlcov'
+    ]),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    install_requires=['numpy>=1.14.5'],
-    python_requires='~=3.6'
+    install_requires=['numpy>=1.19.1'],
+    python_requires='~=3.8'
 )

@@ -1,14 +1,12 @@
 pypsqueak package
 =================
 
-Submodules
-----------
-
 pypsqueak.api module
 --------------------
 
 .. automodule:: pypsqueak.api
     :members:
+    :imported-members:
     :undoc-members:
     :show-inheritance:
 
@@ -17,6 +15,7 @@ pypsqueak.errors module
 
 .. automodule:: pypsqueak.errors
     :members:
+    :imported-members:
     :undoc-members:
     :show-inheritance:
 
@@ -33,6 +32,7 @@ pypsqueak.noise module
 
 .. automodule:: pypsqueak.noise
     :members:
+    :imported-members:
     :undoc-members:
     :show-inheritance:
 
@@ -41,14 +41,6 @@ pypsqueak.squeakcore module
 
 .. automodule:: pypsqueak.squeakcore
     :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-Module contents
----------------
-
-.. automodule:: pypsqueak
-    :members:
+    :imported-members:
     :undoc-members:
     :show-inheritance:

@@ -1,7 +1,8 @@
 '''
 Static gates
 ============
-Pre-defined ``qOp`` objects are provided implementing common static gates.
+Pre-defined ``qOp`` objects are provided implementing the common static gates
+``X``, ``Y``, ``Z``, ``I``, ``H``, ``S`` (phase), and ``T`` (pi/8).
 
 Parametric gates
 ================
