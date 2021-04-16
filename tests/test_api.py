@@ -9,14 +9,13 @@ from pypsqueak.noise import damping_map
 
 
 class TestqRegSuccess:
-    def test_measure_qubit_0(self):
+    def test_measure_qubit_0(self, benchmark):
         '''
-        Verifies that the proper post-measurement state occurs in several
-        cases.
+        Verifies that |0> is measured correctly.
         '''
         test_reg = qReg()
-        # # Measure |0> correctly
-        assert test_reg.measure(0) == 0
+        result = benchmark(test_reg.measure, 0)
+        assert result == 0
         assert np.array_equal(np.array([1, 0]), test_reg.dump_state())
 
     def test_measure_qubits_01(self):
@@ -29,7 +28,7 @@ class TestqRegSuccess:
         assert test_reg.measure(1) == 0
         assert np.array_equal(np.array([0, 1, 0, 0]), test_reg.dump_state())
 
-    def test_measure_X_in_bell_state(self):
+    def test_measure_X_in_bell_state(self, benchmark):
         '''
         Verifies that the observable X has the correct value in the Bell state
         (|00> - |01>)/sqrt(2).
@@ -37,9 +36,10 @@ class TestqRegSuccess:
         test_reg = qReg(2)
         X.on(test_reg, 0)
         H.on(test_reg, 0)
-        assert test_reg.measure_observable(I.kron(X)) == -1
+        result = benchmark(test_reg.measure_observable, I.kron(X))
+        assert result == -1
 
-    def test_measurement_collapses_register_state(self):
+    def test_measurement_collapses_register_state(self, benchmark):
         '''
         Check that a ``qReg`` in the normalized version of the state
         |00> + |10> correctly collapses on measurement of qubit 0 to either
@@ -47,7 +47,7 @@ class TestqRegSuccess:
         '''
         superposition_state = qReg(2)
         H.on(superposition_state, 1)
-        measurement_outcome = superposition_state.measure(1)
+        measurement_outcome = benchmark(superposition_state.measure, 1)
         collapsed_to_00 = (np.array_equal(np.array([1, 0, 0, 0]), superposition_state.dump_state())
                             and measurement_outcome == 0)
         collapsed_to_10 = (np.array_equal(np.array([0, 0, 1, 0]), superposition_state.dump_state())
