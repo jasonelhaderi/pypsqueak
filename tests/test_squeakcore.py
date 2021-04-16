@@ -1,73 +1,61 @@
-# Standard modules
-import unittest
-import numpy as np
 import cmath
+import pytest
+import numpy as np
 
-# pypSQUEAK modules
 from pypsqueak.squeakcore import Qubit, Gate
 from pypsqueak.errors import WrongShapeError, NullVectorError
 
 
-# Qubit Tests
-class QubitValidInput(unittest.TestCase):
-    valid_qubits = [[1.0, 0],
-                    [0.0, 1],
-                    [1.0j, 0],
-                    [1.0j/np.sqrt(2), -1j/np.sqrt(2)],
-                    [24.0, 6],
-                    (24.0, 6),
-                    [1 - 1j, 0j],
-                    [-25.0, 9j],
-                    [-25.0, 9j, 3, 5],
-                    np.array([1.0, 0])]
-
-    def setUp(self):
-        self.test_qubit = Qubit()
-
-    def test_change_and_initialize_equiv(self):
+class TestQubitValidInput:
+    @pytest.mark.parametrize('initialization_vector', [
+        [1, 0, 1, 1],
+        [2, 14 - 8j],
+        (0, 1, 0, 0, 0, 0, 0, 1)
+    ])
+    def test_change_and_initialize_equiv(self, initialization_vector):
         '''
         Initalization of a ``Qubit`` as well as the ``Qubit.change_state()`` method
         should result in the same state if handed the same argument.
         '''
+        test_qubit = Qubit()
+        test_qubit.change_state(initialization_vector)
+        assert np.array_equal(
+            test_qubit.state(),
+            Qubit(initialization_vector).state())
 
-        vectors = [[1, 0, 1, 1],
-                   [2, 14 - 8j],
-                   (0, 1, 0, 0, 0, 0, 0, 1)]
-
-        for vector in vectors:
-            self.test_qubit.change_state(vector)
-            np.testing.assert_array_equal(self.test_qubit.state(), Qubit(vector).state())
-
-    def test_normalize_valid_input(self):
+    @pytest.mark.parametrize('valid_qubit', [
+        [1.0, 0],
+        [0.0, 1],
+        [1.0j, 0],
+        [1.0j/np.sqrt(2), -1j/np.sqrt(2)],
+        [24.0, 6],
+        (24.0, 6),
+        [1 - 1j, 0j],
+        [-25.0, 9j],
+        [-25.0, 9j, 3, 5],
+        np.array([1.0, 0])])
+    def test_normalize_valid_input(self, valid_qubit):
         '''
         ``Qubit.change_state()`` should rescale valid new states to unit vectors.
         '''
+        test_qubit = Qubit()
+        mach_eps = np.finfo(type(valid_qubit[0])).eps
 
-        for vec in self.valid_qubits:
-            # get machine epsilon for relative error
-            mach_eps = np.finfo(type(vec[0])).eps
+        state_dual = np.conjugate(test_qubit.state())
+        inner_product = np.dot(test_qubit.state(), state_dual)
 
-            # change state and compute inner product
-            self.test_qubit.change_state(vec)
-            state_dual = np.conjugate(self.test_qubit.state())
-
-            # if inner product != 1, then test_qubit.normalize() failed
-            inner_product = np.dot(self.test_qubit.state(), state_dual)
-
-            # cmath is used so we don't discard errors in the imaginary part
-            norm_query = cmath.isclose(1, inner_product, rel_tol=10*mach_eps)
-            self.assertTrue(norm_query)
+        assert cmath.isclose(1, inner_product, rel_tol=10**mach_eps)
 
     def test_qubit_product_one_arg(self):
         '''
         Verifies proper result for one arg in ``Qubit.qubit_product()``.
         '''
-
+        test_qubit = Qubit()
         expected_product = np.array([0, 1, 0, 0])
         q1 = Qubit([0, 1])
-        actual_product = self.test_qubit.qubit_product(q1)
+        actual_product = test_qubit.qubit_product(q1)
 
-        np.testing.assert_array_equal(actual_product.state(), expected_product)
+        assert np.array_equal(actual_product.state(), expected_product)
 
     def test_qubit_product_two_args(self):
         '''
@@ -80,8 +68,8 @@ class QubitValidInput(unittest.TestCase):
         initial_state = Qubit([1j, 0])
         actual_product = initial_state.qubit_product(Qubit([1j, 0]), Qubit([1j, 0]))
 
-        np.testing.assert_array_equal(actual_product.state(), expected_product)
-        
+        np.array_equal(actual_product.state(), expected_product)
+
     def test_computational_decomp_two_qubits(self):
         '''
         Checks that ``Qubit.computational_decomp()`` is correct for a Bell pair.
@@ -95,7 +83,7 @@ class QubitValidInput(unittest.TestCase):
             '11': 1/np.sqrt(2)
         }
 
-        self.assertDictEqual(expected_decomposition, bell_pair.computational_decomp())
+        assert expected_decomposition == bell_pair.computational_decomp()
 
     def test_computational_decomp_three_qubits(self):
         '''
@@ -113,8 +101,8 @@ class QubitValidInput(unittest.TestCase):
             '110': 0,
             '111': 1/np.sqrt(3)
         }
-        
-        self.assertDictEqual(expected_decomposition, bell_pair.computational_decomp())
+
+        assert expected_decomposition == bell_pair.computational_decomp()
 
     def test_string_rep_bell_state(self):
         '''
@@ -124,7 +112,7 @@ class QubitValidInput(unittest.TestCase):
         bell_pair = Qubit([1, 0, 0, -1])
         expected_rep = '(7.07e-01)|00> + (-7.07e-01)|11>'
 
-        self.assertEqual(expected_rep, str(bell_pair))
+        assert expected_rep == str(bell_pair)
 
     def test_string_rep_first_term_negative(self):
         '''
@@ -134,7 +122,7 @@ class QubitValidInput(unittest.TestCase):
         qubit = Qubit([-1, 0, 0, 0, 0, 0, 2, 1])
         expected_rep = '(-4.08e-01)|000> + (8.16e-01)|110> + (4.08e-01)|111>'
 
-        self.assertEqual(expected_rep, str(qubit))
+        assert expected_rep == str(qubit)
 
     def test_string_rep_later_term_negative(self):
         '''
@@ -143,7 +131,7 @@ class QubitValidInput(unittest.TestCase):
         qubit = Qubit([1, 0, 0, 0, 0, 0, -2, 1])
         expected_rep = '(4.08e-01)|000> + (-8.16e-01)|110> + (4.08e-01)|111>'
 
-        self.assertEqual(expected_rep, str(qubit))
+        assert expected_rep == str(qubit)
 
     def test_string_rep_complex_term(self):
         '''
@@ -153,242 +141,233 @@ class QubitValidInput(unittest.TestCase):
         qubit = Qubit([1 - 1j, 1j])
         expected_rep = '(5.77e-01-5.77e-01j)|0> + (5.77e-01j)|1>'
 
-        self.assertEqual(expected_rep, str(qubit))
+        assert expected_rep == str(qubit)
 
-class QubitInvalidInput(unittest.TestCase):
+class TestQubitInvalidInput:
 
-    def setUp(self):
-        self.test_qubit = Qubit()
-
-    def test_not_list_or_tuple(self):
+    @pytest.mark.parametrize('bad_vector', [
+        {'key': 'value'},
+        4,
+        'string'
+    ])
+    def test_not_list_or_tuple(self, bad_vector):
         '''
         ``Qubit.change_state()`` should fail when called on a non-listlike.
         '''
+        test_qubit = Qubit()
+        with pytest.raises(TypeError):
+            test_qubit.change_state(bad_vector)
 
-        not_list_or_tuple = [{'key':'value'},
-                             4,
-                             'string']
-        for candidate in not_list_or_tuple:
-            self.assertRaises(TypeError, self.test_qubit.change_state, candidate)
-
-    def test_non_numeric_elements(self):
+    @pytest.mark.parametrize('bad_vector', [
+        ['string'],
+        [['string'], ['string']],
+        [[34, 25]],
+        [[24], [25]],
+        ([24], (25)),
+        [[24, 35], [-2]],
+        [[-1, 3], [4, 17], 2],
+        [{'key': 'value'}, {'key': 'value'}],
+        [(24, 35), (-2)]])
+    def test_non_numeric_elements(self, bad_vector):
         '''
         ``Qubit.change_state()`` should fail for a list-like with nonnumeric
         elements.
         '''
+        test_qubit = Qubit()
+        with pytest.raises(TypeError):
+            test_qubit.change_state(bad_vector)
 
-        non_numeric_elements = [['string'],
-                                [['string'], ['string']],
-                                [[34, 25]],
-                                [[24], [25]],
-                                ([24], (25)),
-                                [[24, 35], [-2]],
-                                [[-1, 3], [4, 17], 2],
-                                [{'key':'value'}, {'key':'value'}],
-                                [(24, 35), (-2)]]
-        for candidate in non_numeric_elements:
-            self.assertRaises(TypeError, self.test_qubit.change_state, candidate)
-
-    def test_wrong_length(self):
+    @pytest.mark.parametrize('bad_vector', [
+        [0, 1, 34],
+        [7]])
+    def test_wrong_length(self, bad_vector):
         '''
-        ``Qubit.change_state()`` should fail for a vector with length that isn't a power of 2 > 1.
+        ``Qubit.change_state()`` should fail for a vector with length that
+        isn't a power of 2 > 1.
         '''
+        test_qubit = Qubit()
 
-        wrong_length = [[0, 1, 34],
-                        [7]]
-        for candidate in wrong_length:
-            self.assertRaises(WrongShapeError, self.test_qubit.change_state, candidate)
+        with pytest.raises(WrongShapeError):
+            test_qubit.change_state(bad_vector)
 
-    def test_zero_vector(self):
+    @pytest.mark.parametrize('null_vector', [
+        [0, 0],
+        [],
+        ()])
+    def test_zero_vector(self, null_vector):
         '''
         ``Qubit.change_state()`` should fail for null vectors.
         '''
-
-        null_vectors = [[0, 0],
-                        [],
-                        ()]
-
-        for null_vec in null_vectors:
-            self.assertRaises(NullVectorError, self.test_qubit.change_state, null_vec)
+        test_qubit = Qubit()
+        with pytest.raises(NullVectorError):
+            test_qubit.change_state(null_vector)
 
     def test_empty_input_qubit_product(self):
         '''
-        ``Qubit.qubit_product()`` with empty argument should raise a ``TypeError``.
+        ``Qubit.qubit_product()`` with empty argument should raise a
+        ``TypeError``.
         '''
+        with pytest.raises(TypeError):
+            Qubit().qubit_product()
 
-        self.assertRaises(TypeError, Qubit().qubit_product)
 
-# Gate tests
-
-class GateValidInput(unittest.TestCase):
-
-    X = np.array([[0, 1],
-                 [1, 0]])
-    Y = np.array([[0, -1j],
-                 [1j, 0]])
-    Z = np.array([[1, 0],
-                 [0, -1]])
-    I = np.array([[1, 0],
-                 [0, 1]])
-    valid_gates = [X, Y, Z, I]
-
-    def setUp(self):
-        self.gate_x = Gate(self.X)
-        self.gate_y = Gate(self.Y)
-        self.gate_z = Gate(self.Z.tolist())
-        self.gate_i = Gate()
-
-    def test_pauli_gates(self):
+class TestGateValidInput:
+    @pytest.mark.parametrize('pauli_matrix', [
+        np.array([[0, 1],
+                  [1, 0]]),
+        np.array([[0, -1j],
+                  [1j, 0]]),
+        np.array([[1, 0],
+                  [0, -1]]),
+        np.array([[1, 0],
+                  [0, 1]])
+    ])
+    def test_pauli_gates_initialize(self, pauli_matrix):
         '''
         Basic Pauli matricies should initialize correctly.
         '''
+        assert np.array_equal(pauli_matrix, Gate(pauli_matrix).state())
 
-        test_gates = [self.gate_x, self.gate_y, self.gate_z, self.gate_i]
-        test_gates = zip(self.valid_gates, test_gates)
 
-        for gate in test_gates:
-            np.testing.assert_array_equal(gate[0], gate[1].state())
-
-class GateInvalidInput(unittest.TestCase):
-
-    def test_non_list_non_tuple(self):
+class TestGateInvalidInput:
+    @pytest.mark.parametrize('not_list_of_rows', [
+        2,
+        'string',
+        ['some', 'list'],
+        None])
+    def test_non_list_non_tuple(self, not_list_of_rows):
         '''
         ``Gate`` should fail to initialize if input not list-like of rows.
         '''
+        with pytest.raises(TypeError):
+            Gate(not_list_of_rows)
 
-        not_list_of_rows = [2,
-                            'string',
-                            ['some', 'list'],
-                            None]
-
-        for candidate in not_list_of_rows:
-            self.assertRaises(TypeError, Gate, candidate)
-
-    def test_non_numeric_elements(self):
+    @pytest.mark.parametrize('nonnumeric_matrix', [
+        [[np.array([3, 4]), 6],
+         [1, -1j]],
+        (('item', 3),
+         (3, 5))
+    ])
+    def test_non_numeric_elements(self, nonnumeric_matrix):
         '''
         ``Gate`` should fail to initialize if input elements aren't numeric.
         '''
-
-        bad_matricies = [[[np.array([3, 4]), 6],[1, -1j]], (('item', 3), (3, 5))]
-
-        for matrix in bad_matricies:
-            self.assertRaises(TypeError, Gate, matrix)
+        with pytest.raises(TypeError):
+            Gate(nonnumeric_matrix)
 
     def test_empty_list_input(self):
         '''
         ``Gate`` should fail to initialize with the empty list as an input.
         '''
+        with pytest.raises(TypeError):
+            Gate([])
 
-        self.assertRaises(TypeError, Gate, [])
-            
-    def test_not_square(self):
+    @pytest.mark.parametrize('non_square_matrix', [
+        [[]],
+        [[1, 2]],
+        [[1, 2, 3],
+         [1, 3, 4]],
+        [[0, 0],
+         [0, 0, 1]],
+        ([1, 2],
+         (1, 2, 3))])
+    def test_not_square(self, non_square_matrix):
         '''
-        ``Gate`` should throw ``TypeError`` if input matrix doesn't have shape ``(n, n)``.
+        ``Gate`` should throw ``TypeError`` if input matrix doesn't have shape
+        ``(n, n)``.
         '''
-
-        wrong_shapes = [[[]],
-                        [[1, 2]],
-                        [[1, 2, 3],
-                         [1, 3, 4]],
-                        [[0, 0],
-                         [0, 0, 1]],
-                         ([1, 2],
-                          (1, 2, 3))]
-        for candidate in wrong_shapes:
-            self.assertRaises(TypeError, Gate, candidate)
+        with pytest.raises(TypeError):
+            Gate(non_square_matrix)
 
     def test_not_power_2(self):
         '''
-        ``Gate`` should fail if matrix is not ``n``X``n`` for ``n == 1`` or ``n`` a power of 2.
+        ``Gate`` should fail if matrix is not ``n``X``n`` for ``n == 1`` or
+        ``n`` a power of 2.
         '''
-
         uneven_shape = [[1, 0, 0],
                         [0, 1, 0],
                         [0, 0, 1]]
+        with pytest.raises(TypeError):
+            Gate(uneven_shape)
 
-        self.assertRaises(TypeError, Gate, uneven_shape)
-
-    def test_not_unitary(self):
+    @pytest.mark.parametrize('non_unitary_matrix', [
+        [[1, 5],
+         [10, 7]],
+        [[0, 1j],
+         [1j + 17, 0]],
+        [[4, 0],
+         [0, -3]],
+        [[0, 0, 0, 0],
+         [0, 0, 0, 0],
+         [0, 0, 0, 0],
+         [0, 0, 0, 0]]])
+    def test_not_unitary(self, non_unitary_matrix):
         '''
         ``Gate`` should fail to initialize non-unitary matrix.
         '''
+        with pytest.raises(TypeError):
+            Gate(non_unitary_matrix)
 
-        M1 = [[1, 5],
-              [10, 7]]
-        M2 = [[0, 1j],
-              [1j + 17, 0]]
-        M3 = [[4, 0],
-              [0, -3]]
-        M4 = [[0, 0, 0, 0],
-              [0, 0, 0, 0],
-              [0, 0, 0, 0],
-              [0, 0, 0, 0]]
 
-        non_unitary_matricies = [M1, M2, M3, M4]
-        for matrix in non_unitary_matricies:
-            self.assertRaises(TypeError, Gate, matrix)
-
-class GateProductValidInput(unittest.TestCase):
-
-    def test_known_two_qubit_gates(self):
+class TestGateProductValidInput:
+    @pytest.mark.parametrize('gate_1, gate_2, product_gate', [
+        (
+            Gate(),
+            Gate([[1, 0],
+                  [0, -1]]),
+            Gate([[1, 0, 0, 0],
+                  [0, -1, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, -1]])),  # I times Z
+        (
+            Gate(),
+            Gate(),
+            Gate([[1, 0, 0, 0],
+                  [0, 1, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]]))  # I times I
+    ])
+    def test_known_two_qubit_gates(self, gate_1, gate_2, product_gate):
         '''
         Checks that known two-qubit gates are formed by ``Gate.gate_product()``
         with one arg.
         '''
-
-        gate_i = Gate()
-        gate_z = Gate([[1, 0],
-                          [0, -1]])
-        gate_i_prod_i = gate_i.gate_product(gate_i)
-        gate_i_prod_z = gate_i.gate_product(gate_z)
-        gate_i_squared = Gate([[1, 0, 0, 0],
-                                  [0, 1, 0, 0],
-                                  [0, 0, 1, 0],
-                                  [0, 0, 0, 1]])
-        gate_i_times_z = Gate([[1, 0, 0, 0],
-                                  [0, -1, 0, 0],
-                                  [0, 0, 1, 0],
-                                  [0, 0, 0, -1]])
-        prod_value_pairs = [(gate_i_prod_i.state(), gate_i_squared.state()),
-                            (gate_i_prod_z.state(), gate_i_times_z.state())]
-
-        for test, result in prod_value_pairs:
-            np.testing.assert_array_equal(test, result)
+        assert np.array_equal((gate_1.gate_product(gate_2)).state(), product_gate.state())
 
     def test_empty_product(self):
         '''
         ``Gate.gate_product()`` should return ``self`` with no arguments.
         '''
-
         gate_z = Gate([[1, 0],
-                          [0, -1]])
+                       [0, -1]])
         gate_empty_arg = gate_z.gate_product()
 
-        np.testing.assert_array_equal(gate_z.state(), gate_empty_arg.state())
+        assert np.array_equal(gate_z.state(), gate_empty_arg.state())
 
     def test_two_args_identity(self):
         '''
         Checks that the tensor product of two identities with identity works.
         '''
-
         gate_i = Gate()
         gate_i_cubed = gate_i.gate_product(gate_i, gate_i)
         gate_should_equal = Gate(np.eye(8))
 
-        np.testing.assert_array_equal(gate_i_cubed.state(), gate_should_equal.state())
+        assert np.array_equal(gate_i_cubed.state(), gate_should_equal.state())
 
-class GateProductInvalidInput(unittest.TestCase):
 
-    def test_non_gate_input(self):
+class TestGateProductInvalidInput:
+
+    @pytest.mark.parametrize('bad_gate', [
+        2,
+        16,
+        [1, 2],
+        [[1, 2],
+         [2, 3]],
+        []
+    ])
+    def test_non_gate_input(self, bad_gate):
         '''
         ``Gate.gate_product()`` should fail with non ``Gate`` input.
         '''
-
-        not_gates = [2, 16, [1, 2], [[1, 2], [2, 3]], []]
-
-        for candidate in not_gates:
-            self.assertRaises(TypeError, Gate().gate_product, candidate)
-
-
-if __name__ == '__main__':
-    unittest.main()
+        with pytest.raises(TypeError):
+            Gate().gate_product(bad_gate)

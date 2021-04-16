@@ -1,10 +1,6 @@
-# Standard modules
-import unittest
-import numpy as np
 import copy
-
-# pypSQUEAK modules
-# import pypsqueak.gates as gt
+import numpy as np
+import pytest
 from pypsqueak.gates import I, X, Z, H, CNOT
 from pypsqueak.api import qReg, qOp, qOracle
 from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
@@ -12,35 +8,36 @@ from pypsqueak.errors import (IllegalCopyAttempt, IllegalRegisterReference,
 from pypsqueak.noise import damping_map
 
 
-class qRegSuccess(unittest.TestCase):
-
-    def setUp(self):
-        # Test register and operator
-        self.test_reg = qReg()
-        self.test_op = qOp()
-
-    def test_known_measurement_results(self):
+class TestqRegSuccess:
+    def test_measure_qubit_0(self):
         '''
         Verifies that the proper post-measurement state occurs in several
         cases.
         '''
+        test_reg = qReg()
+        # # Measure |0> correctly
+        assert test_reg.measure(0) == 0
+        assert np.array_equal(np.array([1, 0]), test_reg.dump_state())
 
-        # Measure |0> correctly
-        self.assertEqual(0, self.test_reg.measure(0))
-        np.testing.assert_array_equal(np.array([1, 0]),
-                                      self.test_reg.dump_state())
+    def test_measure_qubits_01(self):
+        '''
+        Verifies that |01> is measured correctly.
+        '''
+        test_reg = qReg(2)
+        X.on(test_reg, 0)
+        assert test_reg.measure(0) == 1
+        assert test_reg.measure(1) == 0
+        assert np.array_equal(np.array([0, 1, 0, 0]), test_reg.dump_state())
 
-        # Measure |01> correctly
-        self.test_reg += 1
-        X.on(self.test_reg, 0)
-        self.assertEqual(1, self.test_reg.measure(0))
-        np.testing.assert_array_equal(np.array([0, 1, 0, 0]),
-                                      self.test_reg.dump_state())
-
-        # Now let's measure the observable X on the
-        # superposition state (|00> - |01>)/sqrt(2).
-        H.on(self.test_reg, 0)
-        self.assertEqual(-1, self.test_reg.measure_observable(I.kron(X)))
+    def test_measure_X_in_bell_state(self):
+        '''
+        Verifies that the observable X has the correct value in the Bell state
+        (|00> - |01>)/sqrt(2).
+        '''
+        test_reg = qReg(2)
+        X.on(test_reg, 0)
+        H.on(test_reg, 0)
+        assert test_reg.measure_observable(I.kron(X)) == -1
 
     def test_measurement_collapses_register_state(self):
         '''
@@ -48,35 +45,37 @@ class qRegSuccess(unittest.TestCase):
         |00> + |10> correctly collapses on measurement of qubit 0 to either
         |00> or |10>.
         '''
-        initiallySuperposedRegister = qReg(2)
-        H.on(initiallySuperposedRegister, 1)
-        measurement_outcome = initiallySuperposedRegister.measure(1)
+        superposition_state = qReg(2)
+        H.on(superposition_state, 1)
+        measurement_outcome = superposition_state.measure(1)
+        collapsed_to_00 = (np.array_equal(np.array([1, 0, 0, 0]), superposition_state.dump_state())
+                            and measurement_outcome == 0)
+        collapsed_to_10 = (np.array_equal(np.array([0, 0, 1, 0]), superposition_state.dump_state())
+                            and measurement_outcome == 1)
 
-        if measurement_outcome == 0:
-            np.testing.assert_array_equal(
-                initiallySuperposedRegister.dump_state(), [1, 0, 0, 0])
-        else:
-            np.testing.assert_array_equal(
-                initiallySuperposedRegister.dump_state(), [0, 0, 1, 0])
+        assert collapsed_to_00 or collapsed_to_10
 
     def test_measurement_on_five_qubit_state(self):
-        register = qReg(5)
-        X.on(register, 3)
-        X.on(register, 0)
-        H.on(register, 1)
+        '''
+        Checks measurement of qubits 3 and 4 in (|01001> + |01011>)/sqrt(2).
+        '''
+        test_reg = qReg(5)
+        X.on(test_reg, 3)
+        X.on(test_reg, 0)
+        H.on(test_reg, 1)
 
-        self.assertEqual(register.measure(3), 1)
-        self.assertEqual(register.measure(4), 0)
+        assert test_reg.measure(3) == 1
+        assert test_reg.measure(4) == 0
 
     def test_no_target_size_match(self):
         '''
         No targets should be necessary for a ``qOp`` acting on a ``qReg`` of
         the same size.
         '''
-
-        self.test_op.on(self.test_reg)
-        np.testing.assert_array_equal(self.test_reg.dump_state(),
-                                      np.array([1, 0]))
+        test_reg = qReg()
+        test_op = qOp()
+        test_op.on(test_reg)
+        assert np.array_equal(test_reg.dump_state(), np.array([1, 0]))
 
     def test_measure_observable_smaller_than_reg(self):
         '''
@@ -84,40 +83,40 @@ class qRegSuccess(unittest.TestCase):
         observable on the left with the identity when
         ``qReg.size() > observable.size()``.
         '''
+        test_reg = qReg()
 
         # Make the state 1/sqrt(2) (|100> + |101>) and then measure
         # I (x) I (x) X.
-        X.on(self.test_reg, 2)
-        H.on(self.test_reg, 0)
-        result = self.test_reg.measure_observable(X)
+        X.on(test_reg, 2)
+        H.on(test_reg, 0)
+        result = test_reg.measure_observable(X)
 
         state_hadamard = np.zeros(8)
         state_hadamard[4] = 1/np.sqrt(2)
         state_hadamard[5] = 1/np.sqrt(2)
 
-        np.testing.assert_array_almost_equal(state_hadamard,
-                                             self.test_reg.dump_state())
-        self.assertEqual(1, result)
+        assert np.allclose(state_hadamard, test_reg.dump_state())
+        assert result == 1
 
     def test_operator_overloading_misc(self):
         '''
         Tests that several operator overloading methods behave correctly
         for ``qReg`` objects.
         '''
-
+        test_reg = qReg()
         temp_reg = qReg()
         X.on(temp_reg)
         temp_reg += 1
-        self.test_reg *= temp_reg
+        test_reg *= temp_reg
         state_001 = np.array([0, 1, 0, 0, 0, 0, 0, 0])
-        np.testing.assert_array_equal(state_001, self.test_reg.dump_state())
+        assert np.array_equal(state_001, test_reg.dump_state())
 
         temp_reg = qReg()
         X.on(temp_reg)
-        a_new_reg = self.test_reg * temp_reg
+        a_new_reg = test_reg * temp_reg
         state_0011 = np.zeros(16)
         state_0011[3] = 1
-        np.testing.assert_array_equal(state_0011, a_new_reg.dump_state())
+        assert np.array_equal(state_0011, a_new_reg.dump_state())
 
     def test_operator_overloading_iadd(self):
         '''
@@ -127,7 +126,7 @@ class qRegSuccess(unittest.TestCase):
         q = qReg()
         q += 3
 
-        self.assertEqual(4, len(q))
+        assert len(q) == 4
 
     def test_operator_overloading_imul_dereferences_arg(self):
         '''
@@ -139,55 +138,75 @@ class qRegSuccess(unittest.TestCase):
 
         q *= p
 
-        self.assertTrue(p._qReg__is_dereferenced)
-        self.assertFalse(q._qReg__is_dereferenced)
+        assert p._qReg__is_dereferenced and not q._qReg__is_dereferenced
 
 
-class qRegFailure(unittest.TestCase):
+class TestqRegFailure:
+    @pytest.fixture
+    def dereferenced_reg(self):
+        '''
+        Provides a dereferenced register.
+        '''
+        q = qReg()
+        q * qReg()
 
-    def setUp(self):
-        # Test register and operator
-        self.test_reg = qReg()
-        self.test_op = qOp()
+        return q
 
-    def test_copy_attempt(self):
+    @pytest.mark.parametrize("qreg_copy_attempt", [
+        copy.copy,
+        copy.deepcopy
+    ])
+    def test_copy_attempt_fails(self, qreg_copy_attempt):
         '''
         Verifies that copy attempts on a ``qReg`` object fail.
         '''
+        with pytest.raises(IllegalCopyAttempt):
+            test_reg = qReg()
+            qreg_copy_attempt(test_reg)
 
-        self.assertRaises(IllegalCopyAttempt, copy.copy, self.test_reg)
-        self.assertRaises(IllegalCopyAttempt, copy.deepcopy, self.test_reg)
-
-    def test_qReg_construction_fails_with_non_integer_creation_arg(self):
+    @pytest.mark.parametrize("qreg_initializer", [
+        1.1,
+        '0',
+    ])
+    def test_qReg_fails_with_nonint_creation_arg(self, qreg_initializer):
         '''
         Verifies that ``qReg`` initialization fails with non-integer
         ``n_qubits``.
         '''
+        with pytest.raises(TypeError):
+            qReg(qreg_initializer)
 
-        self.assertRaises(TypeError, qReg, 1.1)
-
-    def test_qReg_construction_fails_with_creation_arg_less_than_one(self):
+    @pytest.mark.parametrize("qreg_initializer", [
+        0,
+        -1,
+    ])
+    def test_qReg_fails_with_nonpositive_int_creation_arg(self, qreg_initializer):
         '''
-        Verifies that ``qReg`` initialization fails with ``n_qubits`` less than
-        one.
+        Verifies that ``qReg`` initialization fails with non-integer
+        ``n_qubits``.
         '''
+        with pytest.raises(ValueError):
+            qReg(qreg_initializer)
 
-        self.assertRaises(ValueError, qReg, 0)
-        self.assertRaises(ValueError, qReg, -1)
-
-    def test_mult_checks_both_regs_for_dereference(self):
+    def test_mult_checks_both_regs_for_dereference(self, dereferenced_reg):
         '''
         Verifies that multiplication checks whether both argument registers are
         dereferenced.
         '''
 
         a = qReg()
-        b = a * qReg()
+        b = dereferenced_reg
+        with pytest.raises(IllegalRegisterReference):
+            a * b
 
-        self.assertRaises(IllegalRegisterReference, a.__mul__, b)
-        self.assertRaises(IllegalRegisterReference, b.__mul__, a)
-        self.assertRaises(IllegalRegisterReference, a.__imul__, b)
-        self.assertRaises(IllegalRegisterReference, b.__imul__, a)
+        with pytest.raises(IllegalRegisterReference):
+            b * a
+
+        with pytest.raises(IllegalRegisterReference):
+            a *= b
+
+        with pytest.raises(IllegalRegisterReference):
+            b *= a
 
     def test_register_dereferencing(self):
         '''
@@ -206,61 +225,64 @@ class qRegFailure(unittest.TestCase):
         state_010[2] = 1
 
         # a, b, and c should all be dereferenced. D should be in |0010>
-        np.testing.assert_array_equal(state_010, d.dump_state())
+        assert np.array_equal(state_010, d.dump_state())
 
         deref = [a, b, c]
         for register in deref:
 
             # Checks that the dereferenced register is fully dead (i.e. all
             # methods called with or on it raise an exception.
-            self.assertRaises(IllegalRegisterReference, register.measure, 0)
-            self.assertRaises(IllegalRegisterReference,
-                              register.measure_observable,
-                              Z)
-            self.assertRaises(IllegalRegisterReference, register.peek)
-            self.assertRaises(IllegalRegisterReference, register.dump_state)
-            self.assertRaises(IllegalRegisterReference, register.__iadd__, 1)
-            self.assertRaises(IllegalRegisterReference,
-                              register.__mul__,
-                              qReg())
-            self.assertRaises(IllegalRegisterReference,
-                              register.__imul__,
-                              qReg())
-            self.assertRaises(IllegalRegisterReference, len, register)
-            self.assertRaises(IllegalRegisterReference, X.on, register, 0)
+            with pytest.raises(IllegalRegisterReference):
+                register.measure(0)
+            with pytest.raises(IllegalRegisterReference):
+                register.measure_observable(Z)
+            with pytest.raises(IllegalRegisterReference):
+                register.peek()
+            with pytest.raises(IllegalRegisterReference):
+                register.dump_state()
+            with pytest.raises(IllegalRegisterReference):
+                register += 1
+            with pytest.raises(IllegalRegisterReference):
+                register *= qReg()
+            with pytest.raises(IllegalRegisterReference):
+                register * qReg()
+            with pytest.raises(IllegalRegisterReference):
+                len(register)
+            with pytest.raises(IllegalRegisterReference):
+                X.on(register, 0)
 
-    def test_bad_measurement_index(self):
+    @pytest.mark.parametrize('bad_index', [
+        2.4,
+        8j,
+        -2,
+        'twelve'
+    ])
+    def test_bad_measurement_index(self, bad_index):
         '''
         The ``qReg.measure()`` method throws an ``IndexError`` when the
         argument isn't a nonnegative integer.
         '''
+        test_reg = qReg()
 
-        bad_locs = [2.4, 8j, -2, 'twelve']
+        with pytest.raises(IndexError):
+            test_reg.measure(bad_index)
 
-        for loc in bad_locs:
-            self.assertRaises(IndexError, self.test_reg.measure, loc)
-
-    def test_negative_measurement_index_fails(self):
-        '''
-        Measurement should fail for a negative qubit location index.
-        '''
-
-        self.assertRaises(IndexError, self.test_reg.measure, -1)
-
-    def test_measure_observable_bad_input(self):
+    @pytest.mark.parametrize('bad_observable', [
+        'a',
+        ['peas', 'and', 'more', 'peas'],
+        71,
+        np.eye(8),
+        np.eye(2)
+    ])
+    def test_measure_observable_bad_input(self, bad_observable):
         '''
         The ``qReg.measure_observable()`` method should raise an exception if
         called with a non ``qOp`` object.
         '''
+        test_reg = qReg()
 
-        invalid_ops = ['a',
-                       ['peas', 'and', 'more', 'peas'],
-                       71,
-                       np.eye(8),
-                       np.eye(2)]
-
-        for op in invalid_ops:
-            self.assertRaises(TypeError, self.test_reg.measure_observable, op)
+        with pytest.raises(TypeError):
+            test_reg.measure_observable(bad_observable)
 
     def test__generateStateTransitionProbabilities(self):
         '''
@@ -272,30 +294,22 @@ class qRegFailure(unittest.TestCase):
 
         twoQubitRegister = qReg(2)
 
-        self.assertRaises(
-            NonUnitaryInputError,
-            twoQubitRegister._generateStateTransitionProbabilities,
-            nonUnitaryMatrix)
+        with pytest.raises(NonUnitaryInputError):
+            twoQubitRegister._generateStateTransitionProbabilities(
+                nonUnitaryMatrix)
 
-    def test_operator_overloading_iadd_fails_for_nonint(self):
+    @pytest.mark.parametrize('bad_operand', [
+        3.2,
+        -2
+    ])
+    def test_overload_iadd_fails_for_neg_or_non_int(self, bad_operand):
         '''
         Checks that a ValueError is thrown for noninteger right hand operand
         to `+=`.
         '''
-
         q = qReg()
-
-        self.assertRaises(ValueError, q.__iadd__, 3.2)
-
-    def test_operator_overloading_iadd_fails_for_negative_arg(self):
-        '''
-        Checks that a ValueError is throws for negative right hand operand to
-        `+=`.
-        '''
-
-        q = qReg()
-
-        self.assertRaises(ValueError, q.__iadd__, -2)
+        with pytest.raises(ValueError):
+            q += bad_operand
 
     def test_operator_overloading_imul_fails_for_non_qreg_arg(self):
         '''
@@ -304,130 +318,117 @@ class qRegFailure(unittest.TestCase):
         '''
 
         q = qReg()
-        self.assertRaises(TypeError, q.__imul__, 4)
+        with pytest.raises(TypeError):
+            q *= 4
 
-    def test_operator_overloading_imul_on_dereferenced_args_fails(self):
+    def test_operator_overloading_imul_on_dereferenced_args_fails(self, dereferenced_reg):
         '''
         Checks that `*=` fails when either involved register is dereferenced.
         '''
+        test_reg = qReg()
+        dead_reg = dereferenced_reg
 
-        q = qReg()
-        p = qReg()
-        q *= p
-        r = qReg()
+        with pytest.raises(IllegalRegisterReference):
+            test_reg *= dead_reg
 
-        self.assertRaises(IllegalRegisterReference, q.__imul__, p)
-        self.assertRaises(IllegalRegisterReference, p.__imul__, r)
+        with pytest.raises(IllegalRegisterReference):
+            dead_reg *= test_reg
 
 
-class qOpSuccess(unittest.TestCase):
-
-    def setUp(self):
-        # Test register and operator
-        self.test_reg = qReg()
-        self.test_op = qOp()
-
-    def test_known_operation_results(self):
-        '''
-        Verifies the resulting state of several operations.
-        '''
-
-        test_results = []
-        # Takes |0> to |1>
-        some_reg = qReg()
-        X.on(some_reg)
-        test_results.append(some_reg.dump_state())
-
-        # Takes |0> to |0001>
-        some_reg = qReg()
-        X.on(some_reg)
-        I.on(some_reg, 3)
-        test_results.append(some_reg.dump_state())
-
-        # Takes |0> to (1/sqrt(2))(|000> - |100>)
-        some_reg = qReg()
-        X.on(some_reg, 2)
-        H.on(some_reg, 2)
-        test_results.append(some_reg.dump_state())
-
-        expected_results = [
-            np.array([0, 1]),
+class TestqOpSuccess:
+    @pytest.mark.parametrize("q_circuit, expected_result", [
+        (
+            lambda q_reg: X.on(q_reg),
+            np.array([0, 1])
+        ),  #  Takes |0> to |1>
+        (
+            lambda q_reg: X.on(q_reg) or I.on(q_reg, 3),
             np.array([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-            1/np.sqrt(2) * np.array([1, 0, 0, 0, -1, 0, 0, 0])]
-
-        for test_pair in zip(test_results, expected_results):
-            np.testing.assert_array_almost_equal(test_pair[0], test_pair[1])
+        ),  # Takes |0> to |0001>
+        (
+            lambda q_reg: X.on(q_reg, 2) or H.on(q_reg, 2),
+            1/np.sqrt(2) * np.array([1, 0, 0, 0, -1, 0, 0, 0])
+        )  # Takes |0> to (1/sqrt(2))(|000> - |100>)
+    ])
+    def test_known_operation_results(self, q_circuit, expected_result):
+        '''
+        Verifies the resulting state of several sets of operations.
+        '''
+        some_reg = qReg()
+        q_circuit(some_reg)
+        assert np.allclose(some_reg.dump_state(), expected_result)
 
     def test_add_distant_qubit(self):
         '''
         A ``qOp`` acting on a non-extant target qubit should initialize filler
         qubits in the |0> state.
         '''
-
-        I.on(self.test_reg, 2)
+        test_reg = qReg()
+        I.on(test_reg, 2)
         state_000 = np.array([1, 0, 0, 0, 0, 0, 0, 0])
-        np.testing.assert_array_equal(state_000, self.test_reg.dump_state())
+        assert np.array_equal(state_000, test_reg.dump_state())
 
     def test_known_swaps(self):
         '''
         Verifies known swaps in the private ``qOp.__generate_swap()`` method.
         '''
-
+        test_reg = qReg()
+        test_op = qOp()
         # Verify that |100> gets swapped to |001>
-        X.on(self.test_reg, 2)
-        swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg, 2)
+        X.on(test_reg, 2)
+        swap, inverse_swap = test_op._qOp__generate_swap(test_reg, 2)
         state_100 = np.zeros(8)
         state_100[1] = 1
-        np.testing.assert_array_equal(state_100,
-                                      np.dot(swap, self.test_reg.dump_state()))
+        assert np.array_equal(state_100,
+                              np.dot(swap, test_reg.dump_state()))
 
         # Verify that |100> gets swapped to |010> with targets 1, 2
-        swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg,
-                                                              1, 2)
+        swap, inverse_swap = test_op._qOp__generate_swap(test_reg,
+                                                         1, 2)
         state_010 = np.zeros(8)
         state_010[2] = 1
-        np.testing.assert_array_equal(state_010,
-                                      np.dot(swap, self.test_reg.dump_state()))
+        assert np.array_equal(state_010,
+                              np.dot(swap, test_reg.dump_state()))
 
         # Verify that (|010> - |011>)/sqrt(2) gets
         # swapped to (|100> - |101>)/sqrt(2) with targets 0, 2 and 0, 2, 1
-        for i in range(len(self.test_reg)):
-            X.on(self.test_reg, i)
-        H.on(self.test_reg, 0)
-        swap, inverse_swap = self.test_op._qOp__generate_swap(self.test_reg,
-                                                              0, 2)
-        np.testing.assert_array_equal(swap,
-                                      self.test_op._qOp__generate_swap(
-                                          self.test_reg, 0, 2, 1)[0])
-        np.testing.assert_array_equal(swap,
-                                      self.test_op._qOp__generate_swap(
-                                          self.test_reg, 0, 2)[1])
+        for i in range(len(test_reg)):
+            X.on(test_reg, i)
+        H.on(test_reg, 0)
+        swap, inverse_swap = test_op._qOp__generate_swap(test_reg,
+                                                         0, 2)
+        assert np.array_equal(swap,
+                              test_op._qOp__generate_swap(
+                                  test_reg, 0, 2, 1)[0])
+        assert np.array_equal(swap,
+                              test_op._qOp__generate_swap(
+                                  test_reg, 0, 2)[1])
         state_hadamard = np.zeros(8)
         state_hadamard[4] = 1/np.sqrt(2)
         state_hadamard[5] = -1/np.sqrt(2)
-        np.testing.assert_array_almost_equal(state_hadamard,
-                                             np.dot(
-                                                 swap,
-                                                 self.test_reg.dump_state()))
+        assert np.allclose(state_hadamard,
+                           np.dot(
+                               swap,
+                               test_reg.dump_state()))
 
     def test_identity_swap_for_no_targets(self):
         '''
-        Verifies that the private ``qOp.__generate_swap()`` retuns identity matrices as
-        permutation operators when no nargets are specified.
+        Verifies that the private ``qOp.__generate_swap()`` retuns identity
+        matrices as permutation operators when no nargets are specified.
         '''
 
         two_qubits = qReg(2)
         permutation, inverse = CNOT._qOp__generate_swap(two_qubits)
 
-        np.testing.assert_array_equal(np.eye(4,4), permutation)
-        np.testing.assert_array_equal(np.eye(4,4), inverse)
-        
+        assert np.array_equal(np.eye(4, 4), permutation)
+        assert np.array_equal(np.eye(4, 4), inverse)
+
     def test_set_noise_model(self):
         '''
         Verifies that setting a noise model succeeds.
         '''
-
-        self.test_op.set_noise_model(damping_map(0.2))
+        test_op = qOp()
+        test_op.set_noise_model(damping_map(0.2))
         some_op = qOp(np.eye(2), damping_map(0.2))
         list_of_kraus_ops = [
             np.array([[1, 0],
@@ -436,12 +437,12 @@ class qOpSuccess(unittest.TestCase):
                       [0, 0]]),
         ]
 
-        np.testing.assert_array_equal(
+        assert np.array_equal(
             some_op._qOp__noise_model.getKrausOperators(),
             list_of_kraus_ops
         )
-        np.testing.assert_array_equal(
-            self.test_op._qOp__noise_model.getKrausOperators(),
+        assert np.array_equal(
+            test_op._qOp__noise_model.getKrausOperators(),
             list_of_kraus_ops
         )
 
@@ -450,18 +451,18 @@ class qOpSuccess(unittest.TestCase):
         Deterministic verification of application of gate with
         some NoiseModel set (using prob 1 amplitude damping).
         '''
-
+        test_op = qOp()
         registerInZeroStateInitially = qReg()
         registerInOneStateInitially = qReg()
         X.on(registerInOneStateInitially)
 
-        self.test_op.set_noise_model(damping_map(1.0))
-        self.test_op.on(registerInZeroStateInitially)
-        self.test_op.on(registerInOneStateInitially)
+        test_op.set_noise_model(damping_map(1.0))
+        test_op.on(registerInZeroStateInitially)
+        test_op.on(registerInOneStateInitially)
 
-        np.testing.assert_array_equal(
+        assert np.array_equal(
             registerInZeroStateInitially.dump_state(), [1, 0])
-        np.testing.assert_array_equal(
+        assert np.array_equal(
             registerInOneStateInitially.dump_state(), [1, 0])
 
     def test_apply_noisy_gate_with_raised_register(self):
@@ -470,185 +471,175 @@ class qOpSuccess(unittest.TestCase):
         some NoiseModel set (using prob 1 amplitude damping) where
         qReg needs to be raised.
         '''
-
+        test_op = qOp()
         singleQubitInOneStateInitialy = qReg()
         X.on(singleQubitInOneStateInitialy)
 
-        self.test_op.set_noise_model(damping_map(1.0))
-        self.test_op.on(singleQubitInOneStateInitialy, 1)
+        test_op.set_noise_model(damping_map(1.0))
+        test_op.on(singleQubitInOneStateInitialy, 1)
 
-        np.testing.assert_array_equal(
+        assert np.array_equal(
             singleQubitInOneStateInitialy.dump_state(), [0, 1, 0, 0])
 
     def test_mul_with_qOp_preserves_first_qOp_noise_model(self):
         '''
-        Checks that after multiplication, the resulting `qOp` has
-        the same noise model as the first operand.
+        Checks that after multiplication, the resulting `qOp` inherits
+        the noise model of the first operand.
         '''
         op1 = qOp(kraus_ops=damping_map(0.3))
         op2 = qOp()
 
-        np.testing.assert_array_equal((op1 * op2)._qOp__noise_model, damping_map(0.3))
-        self.assertEqual((op2 * op1)._qOp__noise_model, None)
+        assert np.array_equal((op1 * op2)._qOp__noise_model, damping_map(0.3))
+        assert (op2 * op1)._qOp__noise_model is None
+        assert (op1 * op2)._qOp__noise_model == op1._qOp__noise_model
 
 
-class qOpFailure(unittest.TestCase):
-
-    def setUp(self):
-        # Test register and operator
-        self.test_reg = qReg()
-        self.test_op = qOp()
-
-    def test_non_unitary(self):
+class TestqOpFailure:
+    @pytest.mark.parametrize('nonunitary_matrix', [
+        [[1, 5],
+         [10, 7]],
+        [[0, 1j],
+         [1j + 17, 0]],
+        [[4, 0],
+         [0, -3]],
+        [[0, 0, 0, 0],
+         [0, 0, 0, 0],
+         [0, 0, 0, 0],
+         [0, 0, 0, 0]]
+    ])
+    def test_non_unitary(self, nonunitary_matrix):
         '''
         Checks than an exception gets thrown for non-unitary arguments in the
         initialization of a ``qOp``.
         '''
-
-        M1 = [[1, 5],
-              [10, 7]]
-        M2 = [[0, 1j],
-              [1j + 17, 0]]
-        M3 = [[4, 0],
-              [0, -3]]
-        M4 = [[0, 0, 0, 0],
-              [0, 0, 0, 0],
-              [0, 0, 0, 0],
-              [0, 0, 0, 0]]
-
-        non_unitary_matricies = [M1, M2, M3, M4]
-        for matrix in non_unitary_matricies:
-            self.assertRaises(TypeError, qOp, matrix)
+        with pytest.raises(TypeError):
+            qOp(nonunitary_matrix)
 
     def test_set_noise_model_bad_input(self):
         '''
         ``qOp`` throws a ``TypeError`` if the argument of
         ``qOp.set_noise_model()`` isn't a NoiseModel object.
         '''
-
+        test_op = qOp()
         list_of_kraus_ops = [[[0, 1], [1, 0]], [[1, 0], [0, 1]]]
+        with pytest.raises(TypeError):
+            qOp(np.eye(2), kraus_ops=list_of_kraus_ops)
 
-        self.assertRaises(
-            TypeError,
-            qOp,
-            np.eye(2),
-            kraus_ops=list_of_kraus_ops)
+        with pytest.raises(TypeError):
+            test_op.set_noise_model(list_of_kraus_ops)
 
-        self.assertRaises(
-            TypeError,
-            self.test_op.set_noise_model,
-            list_of_kraus_ops)
-
-    def test_negative_index(self):
+    @pytest.mark.parametrize('bad_target', [
+        -1,
+        1.1,
+        '0'
+    ])
+    def test_non_nonnegative_integer_index_fails(self, bad_target):
         '''
         The ``qOp.on()`` method must fail when specified ``qReg`` target
         addresses are negative.
         '''
-
-        self.assertRaises(IndexError, self.test_op.on, self.test_reg, -1)
+        test_reg = qReg()
+        test_op = qOp()
+        with pytest.raises(IndexError):
+            test_op.on(test_reg, bad_target)
 
     def test_no_target_size_mismatch(self):
         '''
         The ``qOp.on()`` method must fail when no ``qReg`` targets
         are specified AND the operator and register aren't the same size.
         '''
-
-        self.test_reg += 1
-        self.assertRaises(IndexError, self.test_op.on, self.test_reg)
-
-    def test_non_int_index(self):
-        '''
-        The ``qOp.on()`` method must fail with non-integer targets.
-        '''
-
-        self.assertRaises(IndexError, self.test_op.on, self.test_reg, 1.1)
+        test_reg = qReg()
+        test_op = qOp()
+        test_reg += 1
+        with pytest.raises(IndexError):
+            test_op.on(test_reg)
 
     def test_swap_index_out_of_range(self):
         '''
         The private ``qOp.__generate_swap()`` method must fail if one of the
         targets out of range of the ``qReg``.
         '''
+        test_reg = qReg()
+        test_op = qOp()
+        with pytest.raises(IndexError):
+            test_op._qOp__generate_swap(test_reg, 0, 3)
 
-        self.assertRaises(IndexError,
-                          self.test_op._qOp__generate_swap,
-                          self.test_reg, 0, 3)
-
-    def test_swap_non_int_input(self):
+    @pytest.mark.parametrize('bad_target', [
+        -1,
+        1.1,
+    ])
+    def test_swap_non_int_input(self, bad_target):
         '''
         The private ``qOp.__generate_swap()`` method must fail if any of the
         targets are not nonnegative integers.
         '''
 
         some_reg = qReg()
+        test_op = qOp()
         some_reg += 3
+        with pytest.raises(IndexError):
+            test_op._qOp__generate_swap(some_reg, 1, 0, bad_target)
 
-        self.assertRaises(IndexError,
-                          self.test_op._qOp__generate_swap,
-                          some_reg, 0, 0.1)
-        self.assertRaises(IndexError,
-                          self.test_op._qOp__generate_swap,
-                          some_reg, 2, 0, -1)
-
-    def test_invalid_matrix_rep(self):
+    @pytest.mark.parametrize('bad_matrix', [
+        {'mydict': 17},
+        [],
+        [(), ()],
+        4,
+        'apples',
+        [[1, 'test'], [5, (2, 4)]],
+        np.array([['train', 4], [12, 45]])
+    ])
+    def test_invalid_matrix_rep(self, bad_matrix):
         '''
         ``qOp`` throws a ``TypeError`` if the ``matrix_rep`` used to initialize
         it isn't a tuple/list of tuples/lists, a numpy array, or if the
         elements are not numeric.
         '''
-
-        bad_matricies = [{'mydict': 17},
-                         [],
-                         [(), ()],
-                         4,
-                         'apples',
-                         [[1, 'test'], [5, (2, 4)]],
-                         np.array([['train', 4], [12, 45]])]
-
-        for matrix in bad_matricies:
-            self.assertRaises(TypeError, qOp, matrix)
+        with pytest.raises(TypeError):
+            qOp(bad_matrix)
 
     def test_non_square_matrix_rep(self):
         '''
         ``qOp`` throws a ``TypeError`` if the ``matrix_rep`` is not square.
         '''
-
         non_square_matrix = [[0, 1], [2, 3], [3, 4]]
-
-        self.assertRaises(TypeError, qOp, non_square_matrix)
+        with pytest.raises(TypeError):
+            qOp(non_square_matrix)
 
     def test_square_matrix_not_a_power_of_2(self):
         '''
         ``qOp`` throws a ``TypeError`` if the ``matrix_rep`` is square but not
         a power of two.
         '''
-
-        non_square_matrix = [[0, 1, 2], [2, 3, 3], [3, 4, 5]]
-
-        self.assertRaises(TypeError, qOp, non_square_matrix)
+        square_but_wrong_size = [[0, 1, 2], [2, 3, 3], [3, 4, 5]]
+        with pytest.raises(TypeError):
+            qOp(square_but_wrong_size)
 
     def test_duplicate_q_reg_locs(self):
         '''
         The ``qOp.on()`` method must fail when duplicate target qubits are
         specified.
         '''
-
-        self.test_reg += 1
-        self.assertRaises(ValueError, CNOT.on, self.test_reg, 1, 1)
+        test_reg = qReg()
+        test_reg += 1
+        with pytest.raises(ValueError):
+            CNOT.on(test_reg, 1, 1)
 
     def test_gate_and_reg_mismatch(self):
         '''
         The ``qOp.on()`` method must fail when size of the ``qReg`` doesn't
         match the size of ``qOp``.
         '''
+        test_reg = qReg()
+        test_op = qOp()
+        # Too many targets
+        with pytest.raises(WrongShapeError):
+            test_op.on(test_reg, 0, 1)
 
-        # Too many
-        self.assertRaises(WrongShapeError,
-                          self.test_op.on,
-                          self.test_reg, 0, 1)
-
-        self.test_reg += 1
-        # Too few
-        self.assertRaises(WrongShapeError, CNOT.on, self.test_reg, 1)
+        test_reg += 1
+        # Too few targets
+        with pytest.raises(WrongShapeError):
+            CNOT.on(test_reg, 1)
 
     def test_qOpSizeMismatchWithNoiseModel(self):
         '''
@@ -658,38 +649,39 @@ class qOpFailure(unittest.TestCase):
         '''
 
         twoQubitOperator = qOp().kron(qOp())
-
-        self.assertRaises(WrongShapeError,
-                          twoQubitOperator.set_noise_model, damping_map(0.5))
+        with pytest.raises(WrongShapeError):
+            twoQubitOperator.set_noise_model(damping_map(0.5))
 
     def test_kron_on_non_qOps(self):
         '''
         If `qOp.kron()` is called with any args not of type `qOp`,
         raise a TypeError.
         '''
-
-        self.assertRaises(TypeError, self.test_op.kron, np.eye(2))
-        self.assertRaises(TypeError, self.test_op.kron, self.test_op, np.eye(2))
+        test_op = qOp()
+        with pytest.raises(TypeError):
+            test_op.kron(np.eye(2))
+        with pytest.raises(TypeError):
+            test_op.kron(test_op, np.eye(2))
 
     def test_qOpFailsWhenAppliedToDereferencedqReg(self):
         '''
         ``IllegalRegisterReference`` is raised when attempting to operate on a
         ``qReg``.
         '''
-
+        test_op = qOp()
         q_reg = qReg()
         q_reg._qReg__is_dereferenced = True
+        with pytest.raises(IllegalRegisterReference):
+            test_op.on(q_reg)
 
-        self.assertRaises(IllegalRegisterReference, self.test_op.on, q_reg)
 
-
-class qOracleSuccess(unittest.TestCase):
+class TestqOracleSuccess:
     def test_qOracle_is_subclass_of_qOp(self):
         '''
         Verifies that `qOracle` is a subclass of `qOp`.
         '''
 
-        self.assertTrue(issubclass(qOracle, qOp))
+        assert issubclass(qOracle, qOp)
 
     def test_qOracle_const_one_func(self):
         '''
@@ -698,7 +690,7 @@ class qOracleSuccess(unittest.TestCase):
         '''
 
         blackBox = qOracle(lambda x: 1, 1)
-        np.testing.assert_array_equal(
+        assert np.array_equal(
             blackBox._qOp__state.state(),
             [[0, 1, 0, 0],
              [1, 0, 0, 0],
@@ -713,7 +705,7 @@ class qOracleSuccess(unittest.TestCase):
         '''
 
         blackBox = qOracle(lambda x: 0, 1)
-        np.testing.assert_array_equal(
+        assert np.array_equal(
             blackBox._qOp__state.state(),
             [[1, 0, 0, 0],
              [0, 1, 0, 0],
@@ -721,30 +713,32 @@ class qOracleSuccess(unittest.TestCase):
              [0, 0, 0, 1]]
         )
 
-class qOracleFailure(unittest.TestCase):
+
+class TestqOracleFailure:
     def test_classical_func_has_nonint_values(self):
         '''
         Checks that a `TypeError` is raise when the classical func arg
         to `qOracle` has non-int values in its range.
         '''
-        self.assertRaises(TypeError, qOracle, lambda x: 0.1, 3)
+        with pytest.raises(TypeError):
+            qOracle(lambda x: 0.1, 3)
 
     def test_classical_func_needs_to_be_callable(self):
         '''
         Raise a `TypeError` if the classical func used to create
         a `qOracle` isn't a callable.
         '''
-        self.assertRaises(TypeError, qOracle, 4, 5)
+        with pytest.raises(TypeError):
+            qOracle(4, 5)
 
     def test_non_int_dimension_exponents(self):
         '''
         Checks that a `TypeError` gets raised when creating a
         `qOracle` with noninteger dimension exponents.
         '''
-        self.assertRaises(TypeError, qOracle, lambda a: 1, 0.1)
-        self.assertRaises(TypeError, qOracle, lambda a: 0, 1, 0.1)
-        self.assertRaises(TypeError, qOracle, lambda a: 1, 0.1, 0.1)
-
-        
-if __name__ == '__main__':
-    unittest.main()
+        with pytest.raises(TypeError):
+            qOracle(lambda a: a, 0.1)
+        with pytest.raises(TypeError):
+            qOracle(lambda a: a, 1, 0.1)
+        with pytest.raises(TypeError):
+            qOracle(lambda a: a, 0.1, 0.1)
