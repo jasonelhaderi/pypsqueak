@@ -12,13 +12,13 @@ class TestQubitValidInput:
         [2, 14 - 8j],
         (0, 1, 0, 0, 0, 0, 0, 1)
     ])
-    def test_change_and_initialize_equiv(self, initialization_vector):
+    def test_change_and_initialize_equiv(self, initialization_vector, benchmark):
         '''
         Initalization of a ``Qubit`` as well as the ``Qubit.change_state()`` method
         should result in the same state if handed the same argument.
         '''
         test_qubit = Qubit()
-        test_qubit.change_state(initialization_vector)
+        benchmark(test_qubit.change_state, initialization_vector)
         assert np.array_equal(
             test_qubit.state(),
             Qubit(initialization_vector).state())
@@ -46,18 +46,18 @@ class TestQubitValidInput:
 
         assert cmath.isclose(1, inner_product, rel_tol=10**mach_eps)
 
-    def test_qubit_product_one_arg(self):
+    def test_qubit_product_one_arg(self, benchmark):
         '''
         Verifies proper result for one arg in ``Qubit.qubit_product()``.
         '''
         test_qubit = Qubit()
         expected_product = np.array([0, 1, 0, 0])
         q1 = Qubit([0, 1])
-        actual_product = test_qubit.qubit_product(q1)
+        actual_product = benchmark(test_qubit.qubit_product, q1)
 
         assert np.array_equal(actual_product.state(), expected_product)
 
-    def test_qubit_product_two_args(self):
+    def test_qubit_product_two_args(self, benchmark):
         '''
         Verifies proper results for two args in ``Qubit.qubit_product()``.
         '''
@@ -66,11 +66,14 @@ class TestQubitValidInput:
         expected_product[0] = -1j
 
         initial_state = Qubit([1j, 0])
-        actual_product = initial_state.qubit_product(Qubit([1j, 0]), Qubit([1j, 0]))
+        actual_product = benchmark(
+            initial_state.qubit_product,
+            Qubit([1j, 0]),
+            Qubit([1j, 0]))
 
         np.array_equal(actual_product.state(), expected_product)
 
-    def test_computational_decomp_two_qubits(self):
+    def test_computational_decomp_two_qubits(self, benchmark):
         '''
         Checks that ``Qubit.computational_decomp()`` is correct for a Bell pair.
         '''
@@ -83,14 +86,17 @@ class TestQubitValidInput:
             '11': 1/np.sqrt(2)
         }
 
-        assert expected_decomposition == bell_pair.computational_decomp()
+        actual_decomp = benchmark(bell_pair.computational_decomp)
 
-    def test_computational_decomp_three_qubits(self):
+        assert expected_decomposition == actual_decomp
+
+    def test_computational_decomp_three_qubits(self, benchmark):
         '''
-        Checks that ``Qubit.computational_decomp()`` is correct for a three qubit state.
+        Checks that ``Qubit.computational_decomp()`` is correct for a three
+        qubit state.
         '''
 
-        bell_pair = Qubit([1, 0, 1, 0, 0, 0, 0, 1])
+        some_qubits = Qubit([1, 0, 1, 0, 0, 0, 0, 1])
         expected_decomposition = {
             '000': 1/np.sqrt(3),
             '001': 0,
@@ -102,7 +108,9 @@ class TestQubitValidInput:
             '111': 1/np.sqrt(3)
         }
 
-        assert expected_decomposition == bell_pair.computational_decomp()
+        actual_decomp = benchmark(some_qubits.computational_decomp)
+
+        assert expected_decomposition == actual_decomp
 
     def test_string_rep_bell_state(self):
         '''
@@ -142,6 +150,7 @@ class TestQubitValidInput:
         expected_rep = '(5.77e-01-5.77e-01j)|0> + (5.77e-01j)|1>'
 
         assert expected_rep == str(qubit)
+
 
 class TestQubitInvalidInput:
 
@@ -222,11 +231,12 @@ class TestGateValidInput:
         np.array([[1, 0],
                   [0, 1]])
     ])
-    def test_pauli_gates_initialize(self, pauli_matrix):
+    def test_pauli_gates_initialize(self, pauli_matrix, benchmark):
         '''
         Basic Pauli matricies should initialize correctly.
         '''
-        assert np.array_equal(pauli_matrix, Gate(pauli_matrix).state())
+        result_gate = benchmark(Gate, pauli_matrix)
+        assert np.array_equal(pauli_matrix, result_gate.state())
 
 
 class TestGateInvalidInput:
@@ -310,7 +320,7 @@ class TestGateInvalidInput:
 
 
 class TestGateProductValidInput:
-    @pytest.mark.parametrize('gate_1, gate_2, product_gate', [
+    @pytest.mark.parametrize('gate_1, gate_2, expected_product_gate', [
         (
             Gate(),
             Gate([[1, 0],
@@ -327,12 +337,13 @@ class TestGateProductValidInput:
                   [0, 0, 1, 0],
                   [0, 0, 0, 1]]))  # I times I
     ])
-    def test_known_two_qubit_gates(self, gate_1, gate_2, product_gate):
+    def test_known_two_qubit_gates(self, gate_1, gate_2, expected_product_gate, benchmark):
         '''
         Checks that known two-qubit gates are formed by ``Gate.gate_product()``
         with one arg.
         '''
-        assert np.array_equal((gate_1.gate_product(gate_2)).state(), product_gate.state())
+        actual_product_gate = benchmark(gate_1.gate_product, gate_2)
+        assert np.array_equal(actual_product_gate.state(), expected_product_gate.state())
 
     def test_empty_product(self):
         '''

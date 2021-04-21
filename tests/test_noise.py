@@ -7,8 +7,11 @@ from pypsqueak.noise import NoiseModel, b_flip_map
 
 # todo separate out tests on non-noisemodel classes
 class TestNoiseModelValidInput:
+    @staticmethod
+    def compare_noise_models(model_1: NoiseModel, model_2: NoiseModel) -> bool:
+        return model_1 == model_2
 
-    def test_NoiseModelInitializesForValidKrausOpsList(self):
+    def test_NoiseModelInitializesForValidKrausOpsList(self, benchmark):
         '''
         ``NoiseModel`` should initialize correctly with a valid list of
         Kraus matrices.
@@ -20,22 +23,29 @@ class TestNoiseModelValidInput:
                       [0, 0]])
         ]
 
-        damping_map = NoiseModel(damping_map_kraus_ops)
+        damping_map = benchmark(NoiseModel, damping_map_kraus_ops)
         assert damping_map.shape() == (2, 2)
 
-    def test_NoiseModelEqualityBitFlip(self):
+    def test_NoiseModelEqualityBitFlip(self, benchmark):
         '''
         Checks that ``NoiseModel`` equality works for equivalent bit flip maps.
         '''
         prob = 0.5
-        fair_bit_flip = [
+        fair_bit_flip = NoiseModel([
             np.sqrt(prob)*np.array([[1, 0],
                                     [0, 1]]),
             np.sqrt(1 - prob)*np.array([[0, 1],
                                         [1, 0]])
-        ]
+        ])
 
-        assert NoiseModel(fair_bit_flip) == b_flip_map(prob)
+        modelsAreEqual = benchmark(
+            self.compare_noise_models,
+            fair_bit_flip,
+            b_flip_map(prob)
+        )
+
+        assert modelsAreEqual
+        # assert NoiseModel(fair_bit_flip) == b_flip_map(prob)
 
     def test_NoiseModelInequalityBitFlip(self):
         '''
@@ -51,7 +61,7 @@ class TestNoiseModelValidInput:
                                           [1, 0]])
         ]
 
-        NoiseModel(unfair_bit_flip) == b_flip_map(prob_2)
+        assert NoiseModel(unfair_bit_flip) != b_flip_map(prob_2)
 
 
 class TestNoiseModelInvalidInput:
