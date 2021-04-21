@@ -9,6 +9,15 @@ from pypsqueak.noise import damping_map
 
 
 class TestqRegSuccess:
+    def test_create_10qb_qreg(self, benchmark):
+        '''
+        Checks that a `qReg` instance with 10 qubits is created without error.
+        Benchmarks time.
+        '''
+        q = benchmark(qReg, 10)
+
+        assert len(q) == 10
+
     def test_measure_qubit_0(self, benchmark):
         '''
         Verifies that |0> is measured correctly.
@@ -39,7 +48,7 @@ class TestqRegSuccess:
         result = benchmark(test_reg.measure_observable, I.kron(X))
         assert result == -1
 
-    def test_measurement_collapses_register_state(self, benchmark):
+    def test_measurement_collapses_two_qubit_register(self, benchmark):
         '''
         Check that a ``qReg`` in the normalized version of the state
         |00> + |10> correctly collapses on measurement of qubit 0 to either
@@ -55,7 +64,7 @@ class TestqRegSuccess:
 
         assert collapsed_to_00 or collapsed_to_10
 
-    def test_measurement_on_five_qubit_state(self):
+    def test_measurement_on_five_qubit_state(self, benchmark):
         '''
         Checks measurement of qubits 3 and 4 in (|01001> + |01011>)/sqrt(2).
         '''
@@ -64,7 +73,7 @@ class TestqRegSuccess:
         X.on(test_reg, 0)
         H.on(test_reg, 1)
 
-        assert test_reg.measure(3) == 1
+        assert benchmark(test_reg.measure, 3) == 1
         assert test_reg.measure(4) == 0
 
     def test_no_target_size_match(self):
@@ -77,7 +86,7 @@ class TestqRegSuccess:
         test_op.on(test_reg)
         assert np.array_equal(test_reg.dump_state(), np.array([1, 0]))
 
-    def test_measure_observable_smaller_than_reg(self):
+    def test_measure_2qb_observable_on_3qb_reg(self, benchmark):
         '''
         Verifies default behavior of ``qRef.measure_observable()`` is to prefix
         observable on the left with the identity when
@@ -89,7 +98,7 @@ class TestqRegSuccess:
         # I (x) I (x) X.
         X.on(test_reg, 2)
         H.on(test_reg, 0)
-        result = test_reg.measure_observable(X)
+        result = benchmark(test_reg.measure_observable, X)
 
         state_hadamard = np.zeros(8)
         state_hadamard[4] = 1/np.sqrt(2)
@@ -336,6 +345,19 @@ class TestqRegFailure:
 
 
 class TestqOpSuccess:
+    @staticmethod
+    def apply_gate_to_zero_reg_dump_state(
+            num_qubits: int,
+            gate: qOp,
+            target: int,
+            initializer: qOp = None) -> np.array:
+        q = qReg()
+        if initializer is not None:
+            initializer.on(q)
+        gate.on(q, target)
+
+        return q.dump_state()
+
     @pytest.mark.parametrize("q_circuit, expected_result", [
         (
             lambda q_reg: X.on(q_reg),
@@ -358,13 +380,14 @@ class TestqOpSuccess:
         q_circuit(some_reg)
         assert np.allclose(some_reg.dump_state(), expected_result)
 
-    def test_add_distant_qubit(self):
+    def test_add_distant_qubit(self, benchmark):
         '''
         A ``qOp`` acting on a non-extant target qubit should initialize filler
         qubits in the |0> state.
         '''
         test_reg = qReg()
-        I.on(test_reg, 2)
+        benchmark(I.on, test_reg, 2)
+        # I.on(test_reg, 2)
         state_000 = np.array([1, 0, 0, 0, 0, 0, 0, 0])
         assert np.array_equal(state_000, test_reg.dump_state())
 
@@ -446,40 +469,40 @@ class TestqOpSuccess:
             list_of_kraus_ops
         )
 
-    def test_apply_noisy_gate(self):
+    def test_apply_noisy_gate(self, benchmark):
         '''
         Deterministic verification of application of gate with
         some NoiseModel set (using prob 1 amplitude damping).
         '''
         test_op = qOp()
-        registerInZeroStateInitially = qReg()
-        registerInOneStateInitially = qReg()
-        X.on(registerInOneStateInitially)
-
         test_op.set_noise_model(damping_map(1.0))
-        test_op.on(registerInZeroStateInitially)
-        test_op.on(registerInOneStateInitially)
+
+        registerInZeroStateInitiallyResult = benchmark(
+            self.apply_gate_to_zero_reg_dump_state,
+            1,
+            test_op,
+            0
+        )
+        registerInOneStateInitiallyResult = self.apply_gate_to_zero_reg_dump_state(1, test_op, 0, X)
 
         assert np.array_equal(
-            registerInZeroStateInitially.dump_state(), [1, 0])
+            registerInZeroStateInitiallyResult, [1, 0])
         assert np.array_equal(
-            registerInOneStateInitially.dump_state(), [1, 0])
+            registerInOneStateInitiallyResult, [1, 0])
 
     def test_apply_noisy_gate_with_raised_register(self):
         '''
         Deterministic verification of application of gate with
         some NoiseModel set (using prob 1 amplitude damping) where
-        qReg needs to be raised.
+        qReg needs to be raised. Measuring gate.on(|01>, 1).
         '''
         test_op = qOp()
-        singleQubitInOneStateInitialy = qReg()
-        X.on(singleQubitInOneStateInitialy)
-
         test_op.set_noise_model(damping_map(1.0))
-        test_op.on(singleQubitInOneStateInitialy, 1)
+
+        singleQubitInOneStateInitiallyResult = self.apply_gate_to_zero_reg_dump_state(1, test_op, 1, X)
 
         assert np.array_equal(
-            singleQubitInOneStateInitialy.dump_state(), [0, 1, 0, 0])
+            singleQubitInOneStateInitiallyResult, [0, 1, 0, 0])
 
     def test_mul_with_qOp_preserves_first_qOp_noise_model(self):
         '''
