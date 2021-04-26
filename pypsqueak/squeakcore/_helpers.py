@@ -1,13 +1,20 @@
 import numpy as np
 
 
-def _is_listlike(obj):
-    if (type(obj) != list
-        and type(obj) != tuple
-            and not isinstance(obj, type(np.array([0])))):
-        return False
+def _cast_to_1d_numeric_arr(obj) -> np.ndarray:
+    '''
+    Checks that obj can be used to make a 1d complex-valued numpy array.
+    '''
+    try:
+        arr = np.array(obj, dtype=np.complex128)
+    except ValueError:
+        raise TypeError("Input state must be a 1D list, "
+                        "tuple, or numpy array.")
+    if len(arr.shape) > 1:
+        raise TypeError("Input state must be a 1D list, "
+                        "tuple, or numpy array.")
     else:
-        return True
+        return arr
 
 
 def _has_only_numeric_elements(obj):
@@ -40,10 +47,10 @@ def _is_numeric_square_matrix(some_matrix):
         return False
 
     for row in some_matrix:
-        if (not _is_listlike(row)
-            or not _has_only_numeric_elements(row)
-                or (len(row) != column_length)):
-
+        try:
+            if (len(_cast_to_1d_numeric_arr(row)) != column_length):
+                return False
+        except TypeError:
             return False
 
     return True
@@ -70,7 +77,6 @@ def _is_unitary(some_matrix):
 
 
 def _is_normalizable(some_vector):
-
     if all(element == 0 for element in some_vector):
         return False
     else:

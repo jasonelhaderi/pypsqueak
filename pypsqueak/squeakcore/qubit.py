@@ -1,6 +1,6 @@
 import numpy as np
 import copy
-from pypsqueak.squeakcore._helpers import (_is_power_of_two, _is_listlike,
+from pypsqueak.squeakcore._helpers import (_is_power_of_two, _cast_to_1d_numeric_arr,
                                            _has_only_numeric_elements,
                                            _is_normalizable)
 from pypsqueak.errors import NullVectorError, WrongShapeError
@@ -44,7 +44,7 @@ class Qubit:
 
     '''
 
-    def __init__(self, init_state=[1, 0]):
+    def __init__(self, init_state=np.array([1, 0])):
 
         self.__state = None
         self.__computational_decomp = None
@@ -68,10 +68,7 @@ class Qubit:
             altered.
         '''
 
-        self.__validate_state(new_state)
-
-        # Changes the state.
-        self.__state = np.array(new_state)
+        self.__state = self.__validate_state(new_state)
         self.__normalize()
         self.__decompose_into_comp_basis()
 
@@ -155,27 +152,25 @@ class Qubit:
 
         return Qubit(product_state)
 
-    def __validate_state(self, some_vector):
-        if not _is_listlike(some_vector):
-            raise TypeError("Input state must be a list, "
-                            "tuple, or numpy array.")
+    def __validate_state(self, some_vector) -> np.ndarray:
+        new_state = _cast_to_1d_numeric_arr(some_vector)
 
-        if not _has_only_numeric_elements(some_vector):
-            raise TypeError('Elements of input state must be numeric.')
-
-        if not _is_normalizable(some_vector):
+        if not _is_normalizable(new_state):
             raise NullVectorError('State cannot be the null vector.')
 
-        if not _is_power_of_two(len(some_vector)) or len(some_vector) == 1:
+        if not _is_power_of_two(len(new_state)) or len(new_state) == 1:
             raise WrongShapeError("Input state must have a length > 1 "
                                   "which is a power of 2.")
 
-    def __normalize(self):
+        return new_state
 
+    def __normalize(self):
+        '''
+        Sets the norm of the `Qubit` state to unity.
+        '''
         dual_state = np.conjugate(self.__state)
         norm = np.sqrt(np.dot(self.__state, dual_state))
-        self.__state = np.multiply(1/norm, self.__state)
-        self.__decompose_into_comp_basis()
+        self.__state = 1/norm * self.__state
 
     def __decompose_into_comp_basis(self):
         '''

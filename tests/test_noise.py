@@ -45,7 +45,6 @@ class TestNoiseModelValidInput:
         )
 
         assert modelsAreEqual
-        # assert NoiseModel(fair_bit_flip) == b_flip_map(prob)
 
     def test_NoiseModelInequalityBitFlip(self):
         '''
