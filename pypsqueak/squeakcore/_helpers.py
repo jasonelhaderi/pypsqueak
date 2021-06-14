@@ -97,3 +97,33 @@ def _is_power_of_two(n):
         return _is_power_of_two(n/2.0)
     else:
         return False
+
+
+def _multi_arg_kronecker(a, *b):
+    '''
+    Computes Kronecker product of a with list of b.
+    '''
+    MAX_ARGS = 26
+    UNICODE_A_LWR = 97
+    deferred_args = None
+    num_args = 1 + len(b)
+
+    if num_args == 1:
+        return a
+    if num_args > MAX_ARGS:
+        deferred_args = b[MAX_ARGS:]
+        b = b[:MAX_ARGS]
+        num_args = MAX_ARGS
+
+    index_list = ','.join(
+        [chr(UNICODE_A_LWR + i) for i in range(num_args)])
+    contracted_indices = ''.join(
+        [chr(UNICODE_A_LWR + i) for i in range(num_args)])
+
+    result = np.einsum(
+        index_list + '->' + contracted_indices, a, *b).ravel()
+
+    if deferred_args is None:
+        return result
+    else:
+        return _multi_arg_kronecker(result, *deferred_args)

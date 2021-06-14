@@ -1,7 +1,7 @@
 import numpy as np
 import copy
 from pypsqueak.squeakcore._helpers import (_is_power_of_two, _cast_to_1d_numeric_arr,
-                                           _has_only_numeric_elements,
+                                           _multi_arg_kronecker,
                                            _is_normalizable)
 from pypsqueak.errors import NullVectorError, WrongShapeError
 
@@ -137,18 +137,16 @@ class Qubit:
         [0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
 
         '''
+        num_args = len(arg)
 
-        if len(arg) == 0:
+        if num_args < 1:
             raise TypeError('Must specify at least one argument.')
-
         for argument in arg:
             if not isinstance(argument, type(Qubit())):
                 raise TypeError('Arguments must be Qubit() objects.')
 
-        product_state = self.__state
-
-        for argument in arg:
-            product_state = np.kron(product_state, argument.state())
+        product_state = _multi_arg_kronecker(
+            self.__state, *[argument.__state for argument in arg])
 
         return Qubit(product_state)
 
