@@ -1,6 +1,10 @@
-import numpy as np
 import copy
-from pypsqueak.squeakcore._helpers import _is_unitary, _is_power_of_two
+from typing import Tuple
+import numpy as np
+from pypsqueak.squeakcore._helpers import (
+    _is_unitary,
+    _is_power_of_two,
+    _multi_arg_kronecker)
 
 
 class Gate:
@@ -51,13 +55,14 @@ class Gate:
 
         self.__validate_gate(some_matrix, name)
         self.__state = np.array(some_matrix)
+        self.__shape = (len(some_matrix), len(some_matrix[0]))
 
         if name is None:
             self.__name = str(self.__state)
         else:
             self.__name = name
 
-    def state(self):
+    def state(self) -> np.ndarray:
         '''
         The state of the Gate as an ndarray.
 
@@ -68,7 +73,7 @@ class Gate:
         '''
         return np.copy(self.__state)
 
-    def shape(self):
+    def shape(self) -> Tuple[int, int]:
         '''
         Tuple of the Gate's shape. Equivalent to
         ``(2**len(some_gate),) * 2``.
@@ -81,7 +86,7 @@ class Gate:
 
         return copy.deepcopy(self.__shape)
 
-    def name(self):
+    def name(self) -> str:
         '''
         Returns
         -------
@@ -90,7 +95,7 @@ class Gate:
         '''
         return self.__name
 
-    def gate_product(self, *gates):
+    def gate_product(self, *gates: 'Gate') -> 'Gate':
         '''
         Method for returning the Kronecker product of a gate with one or more
         other gates. When multiple arguments are specified, the product is
@@ -137,28 +142,27 @@ class Gate:
 
         '''
 
-        new_gate = self.__state
-
-        if len(gates) == 0:
-            return Gate(new_gate)
-
+        num_args = len(gates)
+        if num_args < 1:
+            return Gate(self.__state)
         for argument in gates:
             if not isinstance(argument, type(Gate())):
                 raise TypeError('Arguments must be Gate() objects.')
 
-        for gate in gates:
-            new_gate = np.kron(new_gate, gate.state())
-        return Gate(new_gate)
+        product_gate = _multi_arg_kronecker(
+            self.__state, *[gate.__state for gate in gates])
+        return Gate(product_gate)
 
-    def __validate_gate(self, potential_gate, gate_name):
+    @staticmethod
+    def __validate_gate(potential_gate, gate_name):
         if _is_unitary(potential_gate):
-            self.__shape = (len(potential_gate), len(potential_gate[0]))
+            gate_shape = (len(potential_gate), len(potential_gate[0]))
         else:
             raise TypeError("Input matrix must be a numeric, "
                             "unitary nxn matrix (madeof nested lists, "
                             "tuples, or as an numpy array).")
 
-        if not _is_power_of_two(self.__shape[0]) or self.__shape[0] == 1:
+        if not _is_power_of_two(gate_shape[0]) or gate_shape[0] == 1:
             raise TypeError('Gate must be nXn with n > 1 a power of 2.')
 
         if (not isinstance(gate_name, str)
@@ -174,5 +178,4 @@ class Gate:
         if self.__name is not None:
             return self.__name
 
-        else:
-            return str(self.__state)
+        return str(self.__state)

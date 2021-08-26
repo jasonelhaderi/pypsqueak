@@ -238,7 +238,6 @@ class TestGateValidInput:
         result_gate = benchmark(Gate, pauli_matrix)
         assert np.array_equal(pauli_matrix, result_gate.state())
 
-
 class TestGateInvalidInput:
     @pytest.mark.parametrize('not_list_of_rows', [
         2,
@@ -364,6 +363,55 @@ class TestGateProductValidInput:
         gate_should_equal = Gate(np.eye(8))
 
         assert np.array_equal(gate_i_cubed.state(), gate_should_equal.state())
+
+    def test_gate_product_5_single_qubit_gates(self, benchmark):
+        '''
+        Check that a nontrivial 5 gate product is computed correctly.
+        '''
+        pauli_x = Gate([[0, 1],
+                        [1, 0]])
+        pauli_y = Gate([[0, -1j],
+                        [1j, 0]])
+        result_gate = benchmark(
+            pauli_x.gate_product,
+            pauli_y,
+            pauli_y,
+            pauli_y,
+            pauli_y)
+
+        # Product is only nonzero on reverse diagonal
+        expected_gate = np.fliplr(
+            np.diag([1, -1, -1, 1,
+                     -1, 1, 1, -1,
+                     -1, 1, 1, -1,
+                     1, -1, -1, 1,
+                     1, -1, -1, 1,
+                     -1, 1, 1, -1,
+                     -1, 1, 1, -1,
+                     1, -1, -1, 1])
+        )
+        assert np.array_equal(expected_gate, result_gate.state())
+
+    def test_gate_product_between_1_and_2_qubit_gates(self, benchmark):
+        '''
+        Check that a nontrivial 3 qubit gate product gets computed correctly.
+        '''
+        pauli_x = Gate([[0, 1],
+                        [1, 0]])
+        pauli_yz = Gate([[0, 0, -1j, 0],
+                         [0, 0, 0, 1j],
+                         [1j, 0, 0, 0],
+                         [0, -1j,0, 0]])
+        expected_gate = np.array([[0, 0, 0, 0, 0, 0, -1j, 0],
+                                  [0, 0, 0, 0, 0, 0, 0, 1j],
+                                  [0 ,0, 0, 0, 1j, 0, 0, 0],
+                                  [0, 0, 0, 0, 0, -1j, 0, 0],
+                                  [0, 0, -1j, 0, 0, 0, 0, 0],
+                                  [0, 0, 0, 1j, 0, 0, 0, 0],
+                                  [1j, 0, 0, 0, 0, 0, 0, 0],
+                                  [0, -1j, 0, 0, 0, 0, 0, 0]])
+        result_gate = benchmark(pauli_x.gate_product, pauli_yz)
+        assert np.array_equal(expected_gate, result_gate.state())
 
 
 class TestGateProductInvalidInput:

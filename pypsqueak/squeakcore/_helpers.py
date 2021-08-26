@@ -1,5 +1,7 @@
 import numpy as np
 
+_UNICODE_A_LWR = 97
+_UNICODE_A_UPPER = 65
 
 def _cast_to_1d_numeric_arr(obj) -> np.ndarray:
     '''
@@ -101,29 +103,48 @@ def _is_power_of_two(n):
 
 def _multi_arg_kronecker(a, *b):
     '''
-    Computes Kronecker product of a with list of b.
+    Computes Kronecker product of a with list of b. Reshapes to the
+    shape of a.
     '''
     MAX_ARGS = 26
-    UNICODE_A_LWR = 97
     deferred_args = None
     num_args = 1 + len(b)
+    dimensions = len(a.shape)
 
     if num_args == 1:
         return a
-    if num_args > MAX_ARGS:
+    elif num_args > MAX_ARGS:
         deferred_args = b[MAX_ARGS:]
         b = b[:MAX_ARGS]
         num_args = MAX_ARGS
 
-    index_list = ','.join(
-        [chr(UNICODE_A_LWR + i) for i in range(num_args)])
-    contracted_indices = ''.join(
-        [chr(UNICODE_A_LWR + i) for i in range(num_args)])
-
-    result = np.einsum(
-        index_list + '->' + contracted_indices, a, *b).ravel()
+    if dimensions == 1:
+        result = _multi_kron_1d(num_args, a, *b)
+    elif dimensions == 2:
+        result = _multi_kron_2d(num_args, a, *b)
 
     if deferred_args is None:
         return result
-    else:
-        return _multi_arg_kronecker(result, *deferred_args)
+
+    return _multi_arg_kronecker(result, *deferred_args)
+
+
+def _multi_kron_1d(num_args, a, *b):
+    index_list = ','.join(
+        [chr(_UNICODE_A_LWR + i) for i in range(num_args)])
+    contracted_indices = ''.join(
+        [chr(_UNICODE_A_LWR + i) for i in range(num_args)])
+    return np.einsum(
+        index_list + '->' + contracted_indices, a, *b).ravel()
+
+
+def _multi_kron_2d(num_args, a, *b):
+    index_list = ','.join(
+        [chr(_UNICODE_A_LWR + i) + chr(_UNICODE_A_UPPER + i) for i in range(num_args)])
+    contracted_indices = ''.join(
+        [chr(_UNICODE_A_LWR + i) for i in range(num_args)]
+        + [chr(_UNICODE_A_UPPER + i) for i in range(num_args)])
+    contraction_string = index_list + '->' + contracted_indices
+    result = np.einsum(contraction_string, a, *b).ravel()
+    result_axis_length = int(np.sqrt(len(result)))
+    return result.reshape((result_axis_length, result_axis_length))
