@@ -142,24 +142,15 @@ class Gate:
 
         '''
 
-        # new_gate = self.__state
-
-        # if len(gates) == 0:
-        #     return Gate(new_gate)
-
         num_args = len(gates)
         if num_args < 1:
             return Gate(self.__state)
-            # raise TypeError('Must specify at least one argument.')
         for argument in gates:
             if not isinstance(argument, type(Gate())):
                 raise TypeError('Arguments must be Gate() objects.')
 
-        # for gate in gates:
-        #     new_gate = np.kron(new_gate, gate.state())
         product_gate = _multi_arg_kronecker(
             self.__state, *[gate.__state for gate in gates])
-        # return Gate(new_gate)
         return Gate(product_gate)
 
     @staticmethod

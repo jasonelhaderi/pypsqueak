@@ -1,5 +1,7 @@
 import numpy as np
 
+_UNICODE_A_LWR = 97
+_UNICODE_A_UPPER = 65
 
 def _cast_to_1d_numeric_arr(obj) -> np.ndarray:
     '''
@@ -105,55 +107,44 @@ def _multi_arg_kronecker(a, *b):
     shape of a.
     '''
     MAX_ARGS = 26
-    UNICODE_A_LWR = 97
-    UNICODE_A_UPPER = 65
     deferred_args = None
     num_args = 1 + len(b)
     dimensions = len(a.shape)
-    # todo: take product of length of axis zero for each argument, use this to set reshape value
-    print("first", a)
-    print("second", b)
 
     if num_args == 1:
         return a
-    if num_args > MAX_ARGS:
+    elif num_args > MAX_ARGS:
         deferred_args = b[MAX_ARGS:]
         b = b[:MAX_ARGS]
         num_args = MAX_ARGS
 
     if dimensions == 1:
-        index_list = ','.join(
-            [chr(UNICODE_A_LWR + i) for i in range(num_args)])
-        contracted_indices = ''.join(
-            [chr(UNICODE_A_LWR + i) for i in range(num_args)])
-        result = np.einsum(
-            index_list + '->' + contracted_indices, a, *b).ravel()
+        result = _multi_kron_1d(num_args, a, *b)
     elif dimensions == 2:
-        index_list = ','.join(
-            [chr(UNICODE_A_LWR + i) + chr(UNICODE_A_UPPER + i) for i in range(num_args)])
-        # contracted_indices = ''.join(
-        #     [chr(UNICODE_A_LWR + i) for i in range(num_args)]) + ''.join([chr(UNICODE_A_UPPER + i) for i in range(num_args)])
-        # contracted_indices = ''.join(
-        #     [chr(UNICODE_A_LWR + i) + chr(UNICODE_A_UPPER + i) for i in range(num_args)])
-        contracted_indices = ''.join(
-            [chr(UNICODE_A_LWR + i) + chr(UNICODE_A_LWR + i + 1) +
-             chr(UNICODE_A_UPPER + i) + chr(UNICODE_A_UPPER + i + 1) for i in range(num_args // 2)])
-        contraction_string = index_list + '->' + contracted_indices
-        print('contracting with the following string:', contraction_string)
-        result = np.einsum(contraction_string, a, *b).ravel()
-        print('raw vector result:', result)
-        # result_axis_length = int(np.log2(len(result)))
-        result_axis_length = int(np.sqrt(len(result)))
-        print(f'Converting to a {result_axis_length}X{result_axis_length} matrix...')
-        result = result.reshape((result_axis_length, result_axis_length))
-        # result_shape = result.shape
-        # result = result.reshape(-1, *result_shape[-2:])
-        print('processed matrix result:', result)
-        # print("string:", index_list + '->' + contracted_indices)
-
-    # print(result.reshape(4, 4))
+        result = _multi_kron_2d(num_args, a, *b)
 
     if deferred_args is None:
         return result
-    else:
-        return _multi_arg_kronecker(result, *deferred_args)
+
+    return _multi_arg_kronecker(result, *deferred_args)
+
+
+def _multi_kron_1d(num_args, a, *b):
+    index_list = ','.join(
+        [chr(_UNICODE_A_LWR + i) for i in range(num_args)])
+    contracted_indices = ''.join(
+        [chr(_UNICODE_A_LWR + i) for i in range(num_args)])
+    return np.einsum(
+        index_list + '->' + contracted_indices, a, *b).ravel()
+
+
+def _multi_kron_2d(num_args, a, *b):
+    index_list = ','.join(
+        [chr(_UNICODE_A_LWR + i) + chr(_UNICODE_A_UPPER + i) for i in range(num_args)])
+    contracted_indices = ''.join(
+        [chr(_UNICODE_A_LWR + i) for i in range(num_args)]
+        + [chr(_UNICODE_A_UPPER + i) for i in range(num_args)])
+    contraction_string = index_list + '->' + contracted_indices
+    result = np.einsum(contraction_string, a, *b).ravel()
+    result_axis_length = int(np.sqrt(len(result)))
+    return result.reshape((result_axis_length, result_axis_length))
