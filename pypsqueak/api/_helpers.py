@@ -43,7 +43,7 @@ def _makeProjectorOnToSubspace(
     projector = np.zeros((
         dimensionOfHilbertSpace,
         dimensionOfHilbertSpace
-    ))
+    ), dtype=np.complex128)
 
     for eigenvalue, state in zip(
             allEigenvalues, matrixOfBasisVectors.T):

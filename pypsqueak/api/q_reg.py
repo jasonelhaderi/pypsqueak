@@ -360,17 +360,14 @@ class qReg:
         operator are 1 and -1.
         '''
         from pypsqueak.gates import I, Z
+        if len(self) == 1:
+            return Z
 
-        if target == len(self) - 1:
-            observable = Z
+        products = [Z if i == target else I for i in range(len(self))]
+        if len(self) > 2:
+            observable = products[-1].kron(products[-2], *products[-3::-1])
         else:
-            observable = I
-
-        for i in reversed(range(len(self) - 1)):
-            if i == target:
-                observable = observable.kron(Z)
-            else:
-                observable = observable.kron(I)
+            observable = products[-1].kron(products[-2])
 
         return observable
 
@@ -399,13 +396,8 @@ class qReg:
                                        "qReg transition probabilities.")
 
         currentStateAsRowVector = self.__q_reg.state().T
-        transitionAmplitudes = np.dot(
-            currentStateAsRowVector,
-            transitionMatrix
-        )
-        transitionProbabilities = [
-            amplitude * amplitude.conj() for amplitude in transitionAmplitudes
-        ]
+        transitionAmplitudes = currentStateAsRowVector @ transitionMatrix
+        transitionProbabilities = np.multiply(transitionAmplitudes.conj(), transitionAmplitudes).astype(np.float64)
 
         return transitionProbabilities
 
@@ -444,8 +436,9 @@ class qReg:
             raise ValueError("Can only add a nonnegative integer number of "
                              "qubits to qReg.")
 
-        n_qubits_in_zero_state = Qubit(
-            [1 if i == 0 else 0 for i in range(2**n_new_qubits)])
+        state_vector = np.zeros(2**n_new_qubits)
+        state_vector[0] = 1
+        n_qubits_in_zero_state = Qubit(state_vector)
 
         self.__q_reg = n_qubits_in_zero_state.qubit_product(self.__q_reg)
         return self

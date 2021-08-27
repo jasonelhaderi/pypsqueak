@@ -146,7 +146,7 @@ class Gate:
         if num_args < 1:
             return Gate(self.__state)
         for argument in gates:
-            if not isinstance(argument, type(Gate())):
+            if not isinstance(argument, Gate):
                 raise TypeError('Arguments must be Gate() objects.')
 
         product_gate = _multi_arg_kronecker(

@@ -46,7 +46,7 @@ class TestqRegSuccess:
         X.on(test_reg, 0)
         H.on(test_reg, 0)
         result = benchmark(test_reg.measure_observable, I.kron(X))
-        assert result == -1
+        assert np.isclose(result, -1)
 
     def test_measurement_collapses_two_qubit_register(self, benchmark):
         '''
@@ -105,7 +105,7 @@ class TestqRegSuccess:
         state_hadamard[5] = 1/np.sqrt(2)
 
         assert np.allclose(state_hadamard, test_reg.dump_state())
-        assert result == 1
+        assert np.isclose(result, 1)
 
     def test_operator_overloading_misc(self):
         '''

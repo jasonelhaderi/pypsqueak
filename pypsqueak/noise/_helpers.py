@@ -20,7 +20,7 @@ def _isListOfIdenticalSizeSquareNumpyArrays(listOfMatrices):
 def _isTracePreserving(listOfMatrices):
     matrixDiagonalLength = listOfMatrices[0].shape[0]
     matrixProducts = map(lambda operator:
-                         np.matmul(np.conjugate(operator.T), operator),
+                         operator.T.conj() @ operator,
                          listOfMatrices)
     sumOfMatrixProducts = reduce(
         lambda product1, product2: product1 + product2,

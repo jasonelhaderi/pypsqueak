@@ -142,7 +142,7 @@ class Qubit:
         if num_args < 1:
             raise TypeError('Must specify at least one argument.')
         for argument in arg:
-            if not isinstance(argument, type(Qubit())):
+            if not isinstance(argument, Qubit):
                 raise TypeError('Arguments must be Qubit() objects.')
 
         product_state = _multi_arg_kronecker(
