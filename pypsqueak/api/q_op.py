@@ -256,7 +256,7 @@ class qOp:
         swappedQubitsReadyForGate = Qubit(
             np.dot(
                 targetQubitSwapMatrix,
-                q_reg._qReg__q_reg.state()))
+                q_reg._qReg__q_reg._Qubit__state))
 
         qubitsAfterGateApplication = self._applyGateToQubits(
             liftedGate,

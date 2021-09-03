@@ -149,7 +149,7 @@ class qReg:
         self._throwExceptionIfRequestedMeasurementIsNotValid(target)
 
         measurement_outcome = self.measure_observable(
-            self._makeComputationalBasisObservable(target))
+            self._make_computational_basis_observable(target))
 
         # Two-state observable eigenvalues are 1 and -1,
         # so manual translation to 0 and 1 (respectively) is needed.
@@ -191,11 +191,11 @@ class qReg:
 
         '''
 
-        self._throwExceptionIfObservableMeasurementIsNotValid(observable)
-        observable = self._liftOperatorToDimensionOfRegister(observable)
+        self._validate_observable(observable)
+        observable = self._lift_qOp_to_qReg_dimension(observable)
 
         eigenvalues, transition_matrix = np.linalg.eig(
-            observable._qOp__state.state())
+            observable._qOp__state._Gate__state)
         transition_probabilities = (
             self._generate_transition_probabilities(
                 transition_matrix)
@@ -306,14 +306,14 @@ class qReg:
             raise IllegalRegisterReference('Measurement attempted on '
                                            'dereferenced register.')
 
-        isTargetQubitIndexValid = (isinstance(target, int)
+        is_target_qubit_valid = (isinstance(target, int)
                                    and target >= 0
                                    and target < len(self))
-        if not isTargetQubitIndexValid:
+        if not is_target_qubit_valid:
             raise IndexError('Quantum register address must be nonnegative '
                              'integer less than size of register.')
 
-    def _throwExceptionIfObservableMeasurementIsNotValid(self, observable):
+    def _validate_observable(self, observable):
         if self.__is_dereferenced:
             raise IllegalRegisterReference("Measurement attempted on "
                                            "dereferenced register.")
@@ -324,7 +324,7 @@ class qReg:
         if len(self) < observable.size():
             raise WrongShapeError("Observable larger than qReg.")
 
-    def _liftOperatorToDimensionOfRegister(self, operator):
+    def _lift_qOp_to_qReg_dimension(self, operator: qOp) -> qOp:
         '''
         Takes the ``qOp`` ``operator`` and if its size is smaller than the
         ``qReg``, returns a 'lifted' version of the operator that has been
@@ -351,7 +351,7 @@ class qReg:
 
         return operator
 
-    def _makeComputationalBasisObservable(self, target):
+    def _make_computational_basis_observable(self, target):
         '''
         Returns a ``qOp`` corresponding to the observable for a computational
         basis measurement on the qubit indexed by ``target``. Since this takes
