@@ -304,7 +304,7 @@ class TestqRegFailure:
         twoQubitRegister = qReg(2)
 
         with pytest.raises(NonUnitaryInputError):
-            twoQubitRegister._generateStateTransitionProbabilities(
+            twoQubitRegister._generate_transition_probabilities(
                 nonUnitaryMatrix)
 
     @pytest.mark.parametrize('bad_operand', [

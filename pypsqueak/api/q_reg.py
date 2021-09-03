@@ -155,7 +155,7 @@ class qReg:
         # so manual translation to 0 and 1 (respectively) is needed.
         return 0 if measurement_outcome == 1 else 1
 
-    def measure_observable(self, observable):
+    def measure_observable(self, observable: qOp):
         '''
         Performs a projective measurement of the ``observable`` corresponding
         to a ``qOp``.
@@ -194,23 +194,23 @@ class qReg:
         self._throwExceptionIfObservableMeasurementIsNotValid(observable)
         observable = self._liftOperatorToDimensionOfRegister(observable)
 
-        measurementEigenvalues, measurementTransitionMatrix = np.linalg.eig(
+        eigenvalues, transition_matrix = np.linalg.eig(
             observable._qOp__state.state())
-        measurementTransitionProbabilities = (
-            self._generateStateTransitionProbabilities(
-                measurementTransitionMatrix)
+        transition_probabilities = (
+            self._generate_transition_probabilities(
+                transition_matrix)
         )
 
-        measurementResult = np.random.choice(
-            measurementEigenvalues,
-            p=measurementTransitionProbabilities)
+        measurement_result = np.random.choice(
+            eigenvalues,
+            p=transition_probabilities)
 
-        self._collapseRegisterWavefunction(
-            measurementResult,
-            measurementEigenvalues,
-            measurementTransitionMatrix)
+        self._collapse_wavefunction(
+            measurement_result,
+            eigenvalues,
+            transition_matrix)
 
-        return measurementResult
+        return measurement_result
 
     def peek(self):
         '''
@@ -371,7 +371,7 @@ class qReg:
 
         return observable
 
-    def _generateStateTransitionProbabilities(self, transitionMatrix):
+    def _generate_transition_probabilities(self, transitionMatrix):
         '''
         Returns a list of the transition probabilities from the current
         ``qReg`` state to the set of normalized states specified by each column
@@ -401,7 +401,7 @@ class qReg:
 
         return transitionProbabilities
 
-    def _collapseRegisterWavefunction(
+    def _collapse_wavefunction(
             self,
             measurementResult,
             measurementEigenvalues,
