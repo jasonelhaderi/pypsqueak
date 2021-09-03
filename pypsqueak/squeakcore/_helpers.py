@@ -3,12 +3,13 @@ import numpy as np
 _UNICODE_A_LWR = 97
 _UNICODE_A_UPPER = 65
 
+
 def _cast_to_1d_numeric_arr(obj) -> np.ndarray:
     '''
     Checks that obj can be used to make a 1d complex-valued numpy array.
     '''
     try:
-        arr = np.array(obj, dtype=np.complex128)
+        arr = np.asarray(obj, dtype=np.complex128)
     except ValueError:
         raise TypeError("Input state must be a 1D list, "
                         "tuple, or numpy array.")
@@ -67,7 +68,7 @@ def _is_unitary(some_matrix):
         return False
 
     product_with_hermitian_conjugate = np.dot(
-        np.array(some_matrix).conj().T,
+        np.asarray(some_matrix).conj().T,
         some_matrix)
 
     if not np.allclose(

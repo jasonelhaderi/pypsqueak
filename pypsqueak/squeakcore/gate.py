@@ -54,7 +54,7 @@ class Gate:
     def __init__(self, some_matrix=[(1, 0), (0, 1)], name=None):
 
         self.__validate_gate(some_matrix, name)
-        self.__state = np.array(some_matrix)
+        self.__state = np.asarray(some_matrix)
         self.__shape = (len(some_matrix), len(some_matrix[0]))
 
         if name is None:

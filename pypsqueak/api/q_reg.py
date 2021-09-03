@@ -97,7 +97,7 @@ class qReg:
         if n_qubits < 1:
             raise ValueError("A qReg must have length of at least 1.")
 
-        init_state = [0 for i in range(2**n_qubits)]
+        init_state = np.zeros(2**n_qubits)
         init_state[0] = 1
         self.__q_reg = Qubit(init_state)
         self.__is_dereferenced = False
