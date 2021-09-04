@@ -3,7 +3,7 @@ from .q_op import qOp
 from pypsqueak.errors import (IllegalRegisterReference, WrongShapeError,
                               NonUnitaryInputError, IllegalCopyAttempt)
 from pypsqueak.squeakcore import Qubit
-from ._helpers import _makeProjectorOnToSubspace
+from ._helpers import _make_subspace_projector
 from pypsqueak.squeakcore._helpers import _is_unitary
 
 
@@ -194,7 +194,7 @@ class qReg:
         self._validate_observable(observable)
         observable = self._lift_qOp_to_qReg_dimension(observable)
 
-        eigenvalues, transition_matrix = np.linalg.eig(
+        eigenvalues, transition_matrix = np.linalg.eigh(
             observable._qOp__state._Gate__state)
         transition_probabilities = (
             self._generate_transition_probabilities(
@@ -395,17 +395,16 @@ class qReg:
                                        "encountered while computing "
                                        "qReg transition probabilities.")
 
-        currentStateAsRowVector = self.__q_reg.state().T
-        transitionAmplitudes = currentStateAsRowVector @ transitionMatrix
+        transitionAmplitudes = self.__q_reg._Qubit__state @ transitionMatrix
         transitionProbabilities = np.multiply(transitionAmplitudes.conj(), transitionAmplitudes).astype(np.float64)
 
         return transitionProbabilities
 
     def _collapse_wavefunction(
             self,
-            measurementResult,
-            measurementEigenvalues,
-            measurementTransitionMatrix):
+            measurement_result,
+            eigenvalues,
+            transition_matrix):
         '''
         Collapses the ``qReg`` to the state corresponding to a measurement of
         ``measurementResult`` for an observable with eigenvalues given by the
@@ -414,11 +413,11 @@ class qReg:
         '''
 
         collapsedState = np.dot(
-            _makeProjectorOnToSubspace(
-                measurementResult,
-                measurementEigenvalues,
-                measurementTransitionMatrix),
-            self.__q_reg.state())
+            _make_subspace_projector(
+                measurement_result,
+                eigenvalues,
+                transition_matrix),
+            self.__q_reg._Qubit__state)
 
         self.__q_reg.change_state(collapsedState)
 
@@ -473,7 +472,7 @@ class qReg:
 
         product_register = qReg()
         product_qubits = self.__q_reg.qubit_product(another_reg._qReg__q_reg)
-        product_register._qReg__q_reg.change_state(product_qubits.state())
+        product_register._qReg__q_reg.change_state(product_qubits._Qubit__state)
 
         self.__is_dereferenced = True
         another_reg._qReg__is_dereferenced = True

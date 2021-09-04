@@ -4,10 +4,10 @@ Internal convenience functions for pypsqueak.api.
 import numpy as np
 
 
-def _makeProjectorOnToSubspace(
-        subspaceEigenvalue,
-        allEigenvalues,
-        matrixOfBasisVectors):
+def _make_subspace_projector(
+        subspace_eigenvalue,
+        all_eigenvalues,
+        matrix_of_basis_vectors):
     '''
     Makes a projection operator onto the subspace of Hilbert space
     which corresponds to ``subspaceEigenvalue``, where the columns of
@@ -39,16 +39,18 @@ def _makeProjectorOnToSubspace(
         The projection operator onto the measurement
         outcome subspace.
     '''
-    dimensionOfHilbertSpace = len(matrixOfBasisVectors)
+    hilbert_space_dimension = len(matrix_of_basis_vectors)
     projector = np.zeros((
-        dimensionOfHilbertSpace,
-        dimensionOfHilbertSpace
+        hilbert_space_dimension,
+        hilbert_space_dimension
     ), dtype=np.complex128)
 
-    for eigenvalue, state in zip(
-            allEigenvalues, matrixOfBasisVectors.T):
-        if eigenvalue == subspaceEigenvalue:
-            projector += np.outer(state, state)
+    eigenvector_indices = np.where(
+        all_eigenvalues == subspace_eigenvalue)[0].tolist()
+    for idx in eigenvector_indices:
+        projector += np.outer(
+            matrix_of_basis_vectors[:, idx],
+            matrix_of_basis_vectors[:, idx].conj())
 
     return projector
 
