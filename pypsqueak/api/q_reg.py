@@ -146,7 +146,7 @@ class qReg:
 
         '''
 
-        self._throwExceptionIfRequestedMeasurementIsNotValid(target)
+        self._validate_requested_measurement(target)
 
         measurement_outcome = self.measure_observable(
             self._make_computational_basis_observable(target))
@@ -301,7 +301,7 @@ class qReg:
 
         return self.__q_reg.state()
 
-    def _throwExceptionIfRequestedMeasurementIsNotValid(self, target):
+    def _validate_requested_measurement(self, target):
         if self.__is_dereferenced:
             raise IllegalRegisterReference('Measurement attempted on '
                                            'dereferenced register.')
@@ -371,7 +371,7 @@ class qReg:
 
         return observable
 
-    def _generate_transition_probabilities(self, transitionMatrix):
+    def _generate_transition_probabilities(self, transition_matrix):
         '''
         Returns a list of the transition probabilities from the current
         ``qReg`` state to the set of normalized states specified by each column
@@ -390,15 +390,15 @@ class qReg:
         state.
         '''
 
-        if not _is_unitary(transitionMatrix):
+        if not _is_unitary(transition_matrix):
             raise NonUnitaryInputError("Non-unitary transition matrix "
                                        "encountered while computing "
                                        "qReg transition probabilities.")
 
-        transitionAmplitudes = self.__q_reg._Qubit__state @ transitionMatrix
-        transitionProbabilities = np.multiply(transitionAmplitudes.conj(), transitionAmplitudes).astype(np.float64)
+        transition_amplitudes = self.__q_reg._Qubit__state @ transition_matrix
+        transition_probabilities = np.multiply(transition_amplitudes.conj(), transition_amplitudes).astype(np.float64)
 
-        return transitionProbabilities
+        return transition_probabilities
 
     def _collapse_wavefunction(
             self,
